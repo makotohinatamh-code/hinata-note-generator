@@ -1,0 +1,36 @@
+name: Daily RSS Score
+
+on:
+  schedule:
+    # 毎朝7時 JST = UTC 22:00（前日）
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    # 手動実行ボタンも有効化
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run generate.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python generate.py
+
+      - name: Commit and push scored_news.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scored_news.json
+          git diff --staged --quiet || git commit -m "chore: update scored_news $(date +'%Y-%m-%d %H:%M JST')"
+          git push
