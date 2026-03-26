@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
-generate.py
-GitHub Actionsで毎朝7時(JST)に自動実行。
-RSS取得 -> Haikuスコアリング -> scored_news.json に保存
+generate.py  —  GitHub Actionsで実行
+モード1: schedule  毎朝7時JST。RSS取得→スコアリング→scored_news.json保存
+モード2: article   スマホからトリガー。選択ニュースで記事生成→article_result.json保存
 """
-import json, os, re, sys
+import json, os, re, sys, concurrent.futures
 import xml.etree.ElementTree as ET
-import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
 from urllib.request import urlopen, Request
 
-JST = timezone(timedelta(hours=9))
+JST               = timezone(timedelta(hours=9))
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-SCORING_MODEL = "claude-haiku-4-5-20251001"
-RSS_MAX_ITEMS = 20
-FRESHNESS_HOURS = 24
-OUTPUT_FILE = "scored_news.json"
+SCORING_MODEL     = "claude-haiku-4-5-20251001"
+GENERATION_MODEL  = "claude-sonnet-4-20250514"
+FRESHNESS_HOURS   = 24
+SCORED_FILE       = "scored_news.json"
+RESULT_FILE       = "article_result.json"
+MODE              = os.environ.get("GENERATE_MODE", "schedule")
+SELECTED_INDICES  = os.environ.get("SELECTED_INDICES", "")
+ARTICLE_MODE      = os.environ.get("ARTICLE_MODE", "free")
 
 RSS_FEEDS = [
     {"url":"https://news.google.com/rss/search?q=%E6%97%A5%E9%8A%80+%E9%87%91%E8%9E%8D%E6%94%BF%E7%AD%96+%E7%82%BA%E6%9B%BF+%E5%86%86%E5%AE%89&hl=ja&gl=JP&ceid=JP:ja","label":"Google News JP (BOJ)","lang":"ja"},
@@ -28,12 +31,7 @@ RSS_FEEDS = [
     {"url":"https://news.google.com/rss/search?q=Bloomberg+Reuters+Japan+economy+BOJ+yen&hl=en&gl=US&ceid=US:en","label":"Google EN (Bloomberg/Reuters)","lang":"en"},
 ]
 
-SCORE_PROMPT = """ニュース記事を5軸で各10点満点（計50点）でスコアリングしてください。英語記事でも日本語で評価してください。
-A. 注目度 B. 先進性 C. 意外性 D. 著者適合性（経済・金融・為替・日銀） E. 読者価値（忙しい日本人ビジネスマン）
-最適なマガジンも選択：boj/fx/market/global/basic
-JSONのみ回答：{"A":X,"B":X,"C":X,"D":X,"E":X,"total":X,"reason":"30字以内","magazine":"id"}"""
-
-def call_claude(system_prompt, user_msg, model, max_tokens=200):
+def call_claude(system_prompt, user_msg, model, max_tokens=4000):
     payload = json.dumps({
         "model": model, "max_tokens": max_tokens,
         "system": system_prompt,
@@ -45,9 +43,10 @@ def call_claude(system_prompt, user_msg, model, max_tokens=200):
         "anthropic-version": "2023-06-01",
     }, method="POST")
     try:
-        with urlopen(req, timeout=60) as res:
+        with urlopen(req, timeout=180) as res:
             return json.loads(res.read())["content"][0]["text"]
     except Exception as e:
+        print(f"Claude APIエラー: {e}", file=sys.stderr)
         return f"[ERROR] {e}"
 
 def parse_pubdate(s):
@@ -61,7 +60,6 @@ def fetch_rss(feed):
     url, label, lang = feed["url"], feed["label"], feed.get("lang","ja")
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=FRESHNESS_HOURS)
-    JST = timezone(timedelta(hours=9))
     try:
         req = Request(url, headers={"User-Agent":"Mozilla/5.0"})
         with urlopen(req, timeout=15) as res:
@@ -70,29 +68,29 @@ def fetch_rss(feed):
         ns = {"atom":"http://www.w3.org/2005/Atom"}
         channel = root.find("channel")
         if channel is None:
-            for e in root.findall("atom:entry", ns)[:RSS_MAX_ITEMS]:
-                title = e.findtext("atom:title", namespaces=ns) or ""
-                lel = e.find("atom:link", ns)
-                link = lel.get("href","") if lel is not None else ""
-                pub_str_raw = e.findtext("atom:published", namespaces=ns) or ""
-                pub_dt = parse_pubdate(pub_str_raw)   # 切り詰め前の生文字列でパース
+            for e in root.findall("atom:entry", ns)[:20]:
+                title   = e.findtext("atom:title", namespaces=ns) or ""
+                lel     = e.find("atom:link", ns)
+                link    = lel.get("href","") if lel is not None else ""
+                pub_raw = e.findtext("atom:published", namespaces=ns) or ""
+                pub_dt  = parse_pubdate(pub_raw)
                 if pub_dt and pub_dt < cutoff: continue
-                pub_display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_str_raw[:16]
+                display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_raw[:16]
                 pub_iso = pub_dt.isoformat() if pub_dt else ""
-                items.append({"title":title.strip(),"link":link,"pubDate":pub_display,
+                items.append({"title":title.strip(),"link":link,"pubDate":display,
                                "pub_dt":pub_iso,"desc":"","lang":lang,"source":label})
         else:
-            for item in channel.findall("item")[:RSS_MAX_ITEMS]:
+            for item in channel.findall("item")[:20]:
                 title   = re.sub(r"<[^>]+>","",item.findtext("title") or "").strip()
                 link    = item.findtext("link") or ""
                 desc    = re.sub(r"<[^>]+>","",item.findtext("description") or "")[:300]
-                pub_str_raw = item.findtext("pubDate") or ""
-                pub_dt  = parse_pubdate(pub_str_raw)  # 切り詰め前の生文字列でパース
+                pub_raw = item.findtext("pubDate") or ""
+                pub_dt  = parse_pubdate(pub_raw)
                 if pub_dt and pub_dt < cutoff: continue
                 if title and link:
-                    pub_display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_str_raw[:16]
+                    display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_raw[:16]
                     pub_iso = pub_dt.isoformat() if pub_dt else ""
-                    items.append({"title":title,"link":link,"pubDate":pub_display,
+                    items.append({"title":title,"link":link,"pubDate":display,
                                   "pub_dt":pub_iso,"desc":desc,"lang":lang,"source":label})
     except Exception as e:
         print(f"RSS error ({label}): {e}", file=sys.stderr)
@@ -106,20 +104,27 @@ def fetch_all():
             if key not in seen and item["link"]:
                 seen.add(key)
                 all_items.append(item)
-    all_items.sort(key=lambda x: x.get("pubDate",""), reverse=True)
+    all_items.sort(key=lambda x: x.get("pub_dt",""), reverse=True)
     return all_items
+
+SCORE_PROMPT = """ニュース記事を5軸で各10点満点（計50点）でスコアリングしてください。英語記事でも日本語で評価してください。
+A.注目度 B.先進性 C.意外性 D.著者適合性（経済・金融・為替・日銀） E.読者価値
+最適なマガジンも選択：boj/fx/market/global/basic
+JSONのみ回答：{"A":X,"B":X,"C":X,"D":X,"E":X,"total":X,"reason":"30字以内","magazine":"id"}"""
 
 def score_single(item):
     prefix = "[EN] " if item.get("lang") == "en" else ""
-    user_msg = f"{prefix}Title: {item['title']}\nSummary: {item.get('desc','')}"
-    raw = call_claude(SCORE_PROMPT, user_msg, model=SCORING_MODEL)
+    raw = call_claude(SCORE_PROMPT,
+                      f"{prefix}Title: {item['title']}\nSummary: {item.get('desc','')}",
+                      model=SCORING_MODEL, max_tokens=150)
     try:
         m = re.search(r'\{.*?\}', raw, re.DOTALL)
         if m:
             d = json.loads(m.group())
             if "total" not in d:
                 d["total"] = sum(d.get(k,0) for k in ["A","B","C","D","E"])
-            return {**item,"scoreData":d,"total":int(d["total"]),"reason":d.get("reason",""),"magazine_tag":d.get("magazine","market")}
+            return {**item,"scoreData":d,"total":int(d["total"]),
+                    "reason":d.get("reason",""),"magazine_tag":d.get("magazine","market")}
     except Exception:
         pass
     return {**item,"scoreData":{},"total":0,"reason":"error","magazine_tag":"market"}
@@ -134,29 +139,185 @@ def score_batch(items):
     results.sort(key=lambda x: x.get("total",0), reverse=True)
     return results
 
+PERSONA_BASE = """あなたは「日向真（ひなた まこと）」として記事を書きます。
+34歳・男性・横浜在住。元大手証券会社 株式ディーリング部（デスクトレーダー6年）。育休中（第一子1歳6ヶ月）。
+一人称「私」。です・ます調。口語的・テンポ速い。短文多用。
+絵文字は📊 📌 💡 🏛️ 🌐 📉 📈 🔍 ⚡ 🗓️ のみ。読者「みなさん」または「忙しいみなさん」。
+禁止：断定的相場予測・特定銘柄推奨・アスタリスク区切り・論文調・週次表現。
+【時制】渡される【ニュース日時情報】を確認し、今日配信なら「今日」、昨日配信なら「昨日」、2日以上前なら「先日」「今週」など正確な表現を使う。"""
+
+PERSONA_FREE = PERSONA_BASE + """
+【構成】冒頭フック(100字)→参照ニュースURL(Markdownリンク)→## 📌まず事実確認(600字)→## 🔍ディーラー目線の裏読み(700字・エピソード必須)→## 🗓️今日注目しておくべきこと(350字)→締め
+文字数1,900〜2,100字。Markdown形式。末尾: #経済ニュース #日銀 #円安 #金融政策 #マーケット #為替 #経済解説 #投資"""
+
+PERSONA_PAID = PERSONA_BASE + """
+【有料記事】無料パート(2,000字)+有料パート(1,500字)。
+無料: 冒頭→参照URL→## 📌表の話→## 🔍ここが気になった→## ⚡ディーラー時代の実体験→有料誘導
+有料: ## 💡なぜ私はそう読んだのか→## 📈私が注目した数字→## 🗓️今後3日間のシナリオ→締め
+有料ラインは「---（ここから有料）---」で明示。"""
+
+PERSONA_SCENARIO = PERSONA_BASE + """
+【シナリオ分析】無料(1,500字)+有料(2,000字)。
+無料: 冒頭→参照URL→## 📊今回の構図→## 🔍サプライズが起きるとしたら→有料誘導
+有料: ## ⚡シナリオA:メイン→## ⚡シナリオB:上振れ→## ⚡シナリオC:下振れ→## 🗓️確認する指標→締め
+有料ラインは「---（ここから有料）---」で明示。"""
+
+TWEET_PROMPT = """「日向真（ひなた まこと）」としてXに投稿します。元大手証券会社ディーラー・育休パパ。
+禁止：アスタリスク区切り・断定的予測。絵文字は📊📌💡🏛️🌐📉📈🔍⚡🗓️のみ。
+4本セットで出力：
+【①告知】公開と同時。数字・フック冒頭。末尾「👉 【noteのURLをここに貼る】」
+【②共感】当日21:00。核心を独立した知識として。URLなし。
+【③保存】翌朝7:00。リスト形式。末尾「👉 【noteのURLをここに貼る】」
+【④エンゲ】翌夜21:00。本音・質問でエンゲージメントを引き出す。URLなし。"""
+
+AI_REV_PROMPT = """日本語文章のAI文体パターンをチェックしてください。
+①アスタリスク区切り ②論文調表現 ③機械的列挙 ④接続詞の連続 ⑤「〜ではないでしょうか」多用 ⑥週次表現 ⑦過度な前置き
+{"ai_score":0-100,"issues":[{"type":"問題タイプ","location":"該当箇所20字以内","suggestion":"修正案"}],"overall":"クリア/軽微な問題あり/要修正"} JSONのみ。"""
+
+MAG_PROMPT = """以下の記事の最適なnoteマガジンを推薦: boj=日銀・金融政策 fx=為替・円安 market=マーケット global=海外発 basic=経済基礎
+{"primary_magazine":"id","secondary_magazine":"idまたはnull","reason":"30字以内","paid_recommendation":true/false,"paid_reason":"理由"} JSONのみ。"""
+
+def build_news_dt_context(selected_items):
+    now_jst  = datetime.now(JST)
+    now_date = now_jst.date()
+    lines = []
+    for i, item in enumerate(selected_items, 1):
+        pub_iso = item.get("pub_dt","")
+        pub_dt  = None
+        if pub_iso:
+            try: pub_dt = datetime.fromisoformat(pub_iso.replace("Z","+00:00"))
+            except Exception: pass
+        if pub_dt:
+            pub_jst = pub_dt.astimezone(JST)
+            delta   = (now_date - pub_jst.date()).days
+            if delta == 0:   rel = f"今日({pub_jst.strftime('%H:%M')}配信)"
+            elif delta == 1: rel = f"昨日({pub_jst.strftime('%m/%d %H:%M')}配信)"
+            elif delta <= 3: rel = f"{delta}日前({pub_jst.strftime('%m/%d')}配信)"
+            else:            rel = f"{delta}日前({pub_jst.strftime('%m/%d')}配信) ※古い記事"
+        else:
+            rel = "配信日時不明"
+        lines.append(f"【{i}】{item['title'][:50]} → {rel}")
+    return "\n".join(lines)
+
+def parse_json_safe(raw):
+    try:
+        m = re.search(r'\{.*?\}', raw, re.DOTALL)
+        if m: return json.loads(m.group())
+    except Exception: pass
+    return {}
+
+def generate_article(selected_items, mode="free"):
+    persona_map = {"free":PERSONA_FREE,"paid":PERSONA_PAID,"scenario":PERSONA_SCENARIO}
+    persona     = persona_map.get(mode, PERSONA_FREE)
+    news_text   = "\n\n".join([f"【{i+1}】{n['title']}\nURL: {n.get('link','')}" for i,n in enumerate(selected_items)])
+    dt_context  = build_news_dt_context(selected_items)
+    now_jst     = datetime.now(JST)
+
+    user_msg = f"""現在日時: {now_jst.strftime('%Y年%m月%d日 %H:%M')} JST
+
+【ニュース日時情報 — 時制決定に必ず使うこと】
+{dt_context}
+
+以下のニュースを元に記事を1本書いてください。
+
+{news_text}
+
+【必須事項】
+1. 時制は【ニュース日時情報】を厳守
+2. 「今日」「本日」は今日配信のニュースの場合のみ使用
+3. AIらしい文体禁止（アスタリスク区切り禁止）
+4. Markdown形式で出力
+5. ディーラー時代のエピソードを必ず1回以上入れる"""
+
+    print("  note記事生成中...")
+    note = call_claude(persona, user_msg, model=GENERATION_MODEL, max_tokens=5000)
+
+    print("  X投稿生成中...")
+    tweet = call_claude(TWEET_PROMPT,
+                        f"以下のnote記事を元にX投稿4本セットを生成してください。\n\n{note[:1500]}",
+                        model=GENERATION_MODEL, max_tokens=800)
+
+    print("  AI文体チェック中...")
+    ai_rev = parse_json_safe(
+        call_claude(AI_REV_PROMPT, note[:1200], model=GENERATION_MODEL, max_tokens=600)
+    )
+
+    title_m = re.search(r"^#\s+(.+)", note, re.MULTILINE)
+    title   = title_m.group(1).strip() if title_m else selected_items[0]["title"][:40]
+
+    print("  マガジン推薦中...")
+    mag = parse_json_safe(
+        call_claude(MAG_PROMPT, f"タイトル：{title}\n冒頭：{note[:400]}", model=SCORING_MODEL, max_tokens=200)
+    )
+
+    agents = []
+    if mode in ("paid","scenario"):
+        print("  エージェントレビュー中（3名）...")
+        agent_defs = [
+            ("📈 経済アナリスト",  "元日銀出身の独立系経済アナリスト(15年)として有料note記事をレビュー。{\"score\":0-100,\"issues\":[],\"strengths\":[],\"rewrite_suggestions\":[],\"verdict\":\"合格/要修正/不合格\"} JSONのみ。"),
+            ("🎯 戦略コンサルタント","外資系戦略コンサルとして有料note記事をレビュー。{\"score\":0-100,\"issues\":[],\"strengths\":[],\"rewrite_suggestions\":[],\"verdict\":\"合格/要修正/不合格\"} JSONのみ。"),
+            ("🏛️ 政策アドバイザー", "元経済産業省・金融庁出身の政策アドバイザーとして有料note記事をレビュー。{\"score\":0-100,\"issues\":[],\"strengths\":[],\"rewrite_suggestions\":[],\"verdict\":\"合格/要修正/不合格\"} JSONのみ。"),
+        ]
+        def run_agent(name, prompt):
+            raw = call_claude(prompt, f"以下の記事をレビューしてください：\n\n{note}", model=GENERATION_MODEL, max_tokens=600)
+            d = parse_json_safe(raw)
+            d["agent"] = name
+            return d
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+            futs = [ex.submit(run_agent, name, prompt) for name, prompt in agent_defs]
+            agents = [f.result() for f in futs]
+
+    tweet_parts = re.split(r'【[①②③④][^\】]*】', tweet)
+    labels = ["① 告知投稿","② 共感・深掘り投稿","③ 保存系投稿","④ エンゲージメント投稿"]
+    tweet_list = [{"label":labels[i] if i < len(labels) else f"投稿{i+1}", "text":p.strip()}
+                  for i, p in enumerate([x.strip() for x in tweet_parts if x.strip()][:4])]
+
+    return {
+        "generated_at": now_jst.strftime("%Y-%m-%d %H:%M"),
+        "title": title,
+        "mode": mode,
+        "note": note,
+        "tweet": tweet,
+        "tweets": tweet_list,
+        "ai_review": ai_rev,
+        "magazine": mag,
+        "agents": agents,
+        "source_news": [n["title"] for n in selected_items],
+        "source_urls":  [n.get("link","") for n in selected_items],
+    }
+
 def main():
-    now_str = datetime.now(JST).strftime('%Y-%m-%d %H:%M')
-    print(f"[{now_str} JST] Starting generate.py")
     if not ANTHROPIC_API_KEY:
         print("ERROR: ANTHROPIC_API_KEY not set", file=sys.stderr)
         sys.exit(1)
-    print("Fetching RSS feeds...")
-    items = fetch_all()
-    print(f"Fetched {len(items)} items")
-    print("Scoring with Haiku...")
-    scored = score_batch(items)
-    print(f"Scored. Top score: {scored[0]['total'] if scored else 0}/50")
-    output = {
-        "generated_at": now_str,
-        "generated_at_iso": datetime.now(timezone.utc).isoformat(),
-        "item_count": len(scored),
-        "items": scored
-    }
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-    print(f"Saved {len(scored)} items to {OUTPUT_FILE}")
-    for i, item in enumerate(scored[:3], 1):
-        print(f"  {i}. [{item['total']}/50] {item['title'][:60]}")
+
+    if MODE == "schedule":
+        print(f"[{datetime.now(JST).strftime('%Y-%m-%d %H:%M JST')}] schedule mode")
+        items = fetch_all()
+        print(f"Fetched {len(items)} items. Scoring...")
+        scored = score_batch(items)
+        output = {"generated_at": datetime.now(JST).strftime("%Y-%m-%d %H:%M"),
+                  "item_count": len(scored), "items": scored}
+        with open(SCORED_FILE, "w", encoding="utf-8") as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+        print(f"Saved {len(scored)} items to {SCORED_FILE}")
+
+    elif MODE == "article":
+        print(f"[{datetime.now(JST).strftime('%Y-%m-%d %H:%M JST')}] article mode ({ARTICLE_MODE})")
+        if not SELECTED_INDICES:
+            print("ERROR: SELECTED_INDICES not set", file=sys.stderr); sys.exit(1)
+        with open(SCORED_FILE, encoding="utf-8") as f:
+            scored_data = json.load(f)
+        all_items = scored_data.get("items", [])
+        indices  = [int(i.strip()) for i in SELECTED_INDICES.split(",") if i.strip().isdigit()]
+        selected = [all_items[i] for i in indices if i < len(all_items)]
+        if not selected:
+            print("ERROR: No valid items selected", file=sys.stderr); sys.exit(1)
+        print(f"Generating for {len(selected)} items...")
+        result = generate_article(selected, mode=ARTICLE_MODE)
+        with open(RESULT_FILE, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"Done. Title: {result['title']}")
 
 if __name__ == "__main__":
     main()
