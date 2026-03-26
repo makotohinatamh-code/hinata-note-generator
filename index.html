@@ -499,10 +499,12 @@ ${newsText}
 3. AIらしい文体パターン一切禁止（アスタリスク区切り禁止）
 4. Markdown形式で出力
 5. ディーラー時代のエピソードを必ず1回以上入れる`;
-    const [note,tweet]=await Promise.all([
-      callClaude(persona,userMsg,5000),
-      (async()=>{const n=await callClaude(persona,userMsg,5000).catch(()=>'');return callClaude(TWEET_PROMPT,`以下のnote記事を元にX投稿4本セットを生成してください。\n\n${note||''}`.substring(0,2000),800);})()
-    ]);
+    // 1. まずnote記事を生成
+    const note=await callClaude(persona,userMsg,5000);
+
+    // 2. note完成後にX投稿を生成
+    const tweet=await callClaude(TWEET_PROMPT,
+      `以下のnote記事を元にX投稿4本セットを生成してください。\n\n${note.substring(0,1500)}`,800);
 
     clearInterval(anim);
     const el=document.getElementById('genPb');if(el)el.style.width='60%';
