@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-26 23:30",
+  "generated_at": "2026-03-27 08:00",
   "item_count": 11,
   "items": [
     {
@@ -14,14 +14,14 @@
         "A": 9,
         "B": 8,
         "C": 7,
-        "D": 10,
-        "E": 9,
-        "total": 43,
-        "reason": "日銀の利上げ観測による2年債利回り急上昇は市場転換の重要シグナル。金融政策転換期の中核ニュース。",
+        "D": 9,
+        "E": 8,
+        "total": 41,
+        "reason": "日銀の利上げ観測が短期債利回り急上昇を駆動。30年ぶりの高水準は政策転換の重要な指標。",
         "magazine": "boj"
       },
-      "total": 43,
-      "reason": "日銀の利上げ観測による2年債利回り急上昇は市場転換の重要シグナル。金融政策転換期の中核ニュース。",
+      "total": 41,
+      "reason": "日銀の利上げ観測が短期債利回り急上昇を駆動。30年ぶりの高水準は政策転換の重要な指標。",
       "magazine_tag": "boj"
     },
     {
@@ -33,17 +33,17 @@
       "lang": "en",
       "source": "Google EN (FX)",
       "scoreData": {
-        "A": 7,
-        "B": 8,
-        "C": 7,
+        "A": 8,
+        "B": 7,
+        "C": 6,
         "D": 9,
         "E": 8,
-        "total": 39,
-        "reason": "為替政策と商品市場の連関を論じた興味深い観点。日銀の政策手段拡張の示唆あり。",
+        "total": 38,
+        "reason": "円支援の具体的手段として石油市場活用を提案。日銀・為替政策に直結。",
         "magazine": "fx"
       },
-      "total": 39,
-      "reason": "為替政策と商品市場の連関を論じた興味深い観点。日銀の政策手段拡張の示唆あり。",
+      "total": 38,
+      "reason": "円支援の具体的手段として石油市場活用を提案。日銀・為替政策に直結。",
       "magazine_tag": "fx"
     },
     {
@@ -61,41 +61,19 @@
         "D": 9,
         "E": 8,
         "total": 38,
-        "reason": "為替介入の評価基準を定量的に説明。実務的で日銀関連性が高く、読者の判断材料になる。",
+        "reason": "為替介入の評価基準を明確化。実務的で読者にとって有用な判断枠組みを提示。",
         "magazine": "fx"
       },
       "total": 38,
-      "reason": "為替介入の評価基準を定量的に説明。実務的で日銀関連性が高く、読者の判断材料になる。",
+      "reason": "為替介入の評価基準を明確化。実務的で読者にとって有用な判断枠組みを提示。",
       "magazine_tag": "fx"
     },
     {
-      "title": "債券市場、｢22年型インフレ｣警戒 エネ高騰が長期金利の上昇圧力に - 日本経済新聞",
-      "link": "https://news.google.com/rss/articles/CBMibEFVX3lxTFA0S3RSVzRBbTNwX01tdG45MGdERFh4cmFfWEpwVjZQRkpHVDZ1WDJYTmhuRGJVUkV3RS0wVFBjWFlHUzhvX2pGOVlLbDV3ZlpDUnVrbXF2SHpXc05Ia2VsbDFVQWRCQ3k1YW95MA?oc=5",
-      "pubDate": "2026-03-26 02:00",
-      "pub_dt": "2026-03-25T17:00:00+00:00",
-      "desc": "債券市場、｢22年型インフレ｣警戒 エネ高騰が長期金利の上昇圧力に&nbsp;&nbsp;日本経済新聞",
-      "lang": "ja",
-      "source": "Google News JP (Market)",
-      "scoreData": {
-        "A": 8,
-        "B": 7,
-        "C": 6,
-        "D": 9,
-        "E": 8,
-        "total": 38,
-        "reason": "エネルギー高騰がインフレ・長期金利に与える影響を分析。日本の金融市場動向として重要性高い。",
-        "magazine": "boj"
-      },
-      "total": 38,
-      "reason": "エネルギー高騰がインフレ・長期金利に与える影響を分析。日本の金融市場動向として重要性高い。",
-      "magazine_tag": "boj"
-    },
-    {
-      "title": "欧米為替：デイリー見通し ドル・円／上値で為替介入に警戒(フィスコ) - Yahoo!ファイナンス",
-      "link": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQZVJaTHN1d0E4OUF1amFDYlp4ZXMtR1lZd3NzdnQ3OF9fOE5JcXlVS204NFRJUGpReDhpaGxHUFVXNTdfLWNSd25FZjFtN2RtYmZ4cEo1WlpGLTBFMXE4RTBNdUhtRnVJMVdBNi0xYWJ0NVRsYXZmUDkzMENuNGxBSlBMSlhyNUU?oc=5",
-      "pubDate": "2026-03-26 13:15",
-      "pub_dt": "2026-03-26T04:15:00+00:00",
-      "desc": "欧米為替：デイリー見通し ドル・円／上値で為替介入に警戒(フィスコ)&nbsp;&nbsp;Yahoo!ファイナンス",
+      "title": "ドル/円、下値は原油高・有事のドル買いで固く、上値は為替介入警戒で重い159円台の攻防を徹底解説（今夜のFX予想）2026/3/26 #外為ドキッ - 外為どっとコム",
+      "link": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE9xQlJHakJHVlVJUzF4WGdKVzdJeFZ0RnVwVGNYY0xiYVRyZmdJOWZCVjlfRmR2OVBKa2VCOXB0N1hhZDBQS3NubTRwU3hBSnl0a09Tc1BNLWZMTHlmZUdmXzhlbw?oc=5",
+      "pubDate": "2026-03-26 16:45",
+      "pub_dt": "2026-03-26T07:45:11+00:00",
+      "desc": "ドル/円、下値は原油高・有事のドル買いで固く、上値は為替介入警戒で重い159円台の攻防を徹底解説（今夜のFX予想）2026/3/26 #外為ドキッ&nbsp;&nbsp;外為どっとコム",
       "lang": "ja",
       "source": "Google News JP (FX)",
       "scoreData": {
@@ -105,11 +83,33 @@
         "D": 9,
         "E": 8,
         "total": 36,
-        "reason": "ドル円の為替介入リスク分析は実用的。デイリー見通しとして日々の取引参考価値が高い。",
+        "reason": "為替介入リスクと原油動向を組み合わせた実戦的な分析。タイムリーな相場予想で実用性高い",
         "magazine": "fx"
       },
       "total": 36,
-      "reason": "ドル円の為替介入リスク分析は実用的。デイリー見通しとして日々の取引参考価値が高い。",
+      "reason": "為替介入リスクと原油動向を組み合わせた実戦的な分析。タイムリーな相場予想で実用性高い",
+      "magazine_tag": "fx"
+    },
+    {
+      "title": "東京為替：ドル・円は伸び悩み、為替介入に警戒 執筆： Fisco - Investing.com - FX | 株式市場 | ファイナンス | 金融ニュース",
+      "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE1HNWJCaW56QUJBSmpZTGIwYlBjWkJpTkl6REtDMm9ieDBSUXhwcFY4UmlJRDhrd3pWc3Q1WDE0cngtVk1HOVppQ1BTX0RweE1xMmx4TG9tQV9xS0hEd0RNYUNQbFBTR0E?oc=5",
+      "pubDate": "2026-03-26 13:08",
+      "pub_dt": "2026-03-26T04:08:00+00:00",
+      "desc": "東京為替：ドル・円は伸び悩み、為替介入に警戒 執筆： Fisco&nbsp;&nbsp;Investing.com - FX | 株式市場 | ファイナンス | 金融ニュース",
+      "lang": "ja",
+      "source": "Google News JP (FX)",
+      "scoreData": {
+        "A": 8,
+        "B": 6,
+        "C": 5,
+        "D": 9,
+        "E": 8,
+        "total": 36,
+        "reason": "為替介入への警戒は実務的で重要。ドル円の値動きは市場参加者必見だが内容が限定的。",
+        "magazine": "fx"
+      },
+      "total": 36,
+      "reason": "為替介入への警戒は実務的で重要。ドル円の値動きは市場参加者必見だが内容が限定的。",
       "magazine_tag": "fx"
     },
     {
@@ -125,35 +125,35 @@
         "B": 6,
         "C": 5,
         "D": 9,
-        "E": 8,
-        "total": 36,
-        "reason": "ドル円の動向と介入リスクは市場参加者にとって重要。ただし速報性や新規性は限定的。",
-        "magazine": "fx"
-      },
-      "total": 36,
-      "reason": "ドル円の動向と介入リスクは市場参加者にとって重要。ただし速報性や新規性は限定的。",
-      "magazine_tag": "fx"
-    },
-    {
-      "title": "東京為替：ドル・円は伸び悩み、為替介入に警戒 執筆： Fisco - Investing.com - FX | 株式市場 | ファイナンス | 金融ニュース",
-      "link": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE1HNWJCaW56QUJBSmpZTGIwYlBjWkJpTkl6REtDMm9ieDBSUXhwcFY4UmlJRDhrd3pWc3Q1WDE0cngtVk1HOVppQ1BTX0RweE1xMmx4TG9tQV9xS0hEd0RNYUNQbFBTR0E?oc=5",
-      "pubDate": "2026-03-26 13:08",
-      "pub_dt": "2026-03-26T04:08:00+00:00",
-      "desc": "東京為替：ドル・円は伸び悩み、為替介入に警戒 執筆： Fisco&nbsp;&nbsp;Investing.com - FX | 株式市場 | ファイナンス | 金融ニュース",
-      "lang": "ja",
-      "source": "Google News JP (FX)",
-      "scoreData": {
-        "A": 8,
-        "B": 5,
-        "C": 6,
-        "D": 9,
         "E": 7,
         "total": 35,
-        "reason": "ドル円の為替介入リスクを指摘する時事的で実用的な記事。市場参加者向け情報として有用だが、新規性は限定的。",
+        "reason": "為替介入への警戒は重要だが、具体的データ不足。日銀政策との関連性が高い。",
         "magazine": "fx"
       },
       "total": 35,
-      "reason": "ドル円の為替介入リスクを指摘する時事的で実用的な記事。市場参加者向け情報として有用だが、新規性は限定的。",
+      "reason": "為替介入への警戒は重要だが、具体的データ不足。日銀政策との関連性が高い。",
+      "magazine_tag": "fx"
+    },
+    {
+      "title": "欧米為替：デイリー見通し ドル・円／上値で為替介入に警戒(フィスコ) - Yahoo!ファイナンス",
+      "link": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQZVJaTHN1d0E4OUF1amFDYlp4ZXMtR1lZd3NzdnQ3OF9fOE5JcXlVS204NFRJUGpReDhpaGxHUFVXNTdfLWNSd25FZjFtN2RtYmZ4cEo1WlpGLTBFMXE4RTBNdUhtRnVJMVdBNi0xYWJ0NVRsYXZmUDkzMENuNGxBSlBMSlhyNUU?oc=5",
+      "pubDate": "2026-03-26 13:15",
+      "pub_dt": "2026-03-26T04:15:00+00:00",
+      "desc": "欧米為替：デイリー見通し ドル・円／上値で為替介入に警戒(フィスコ)&nbsp;&nbsp;Yahoo!ファイナンス",
+      "lang": "ja",
+      "source": "Google News JP (FX)",
+      "scoreData": {
+        "A": 7,
+        "B": 5,
+        "C": 4,
+        "D": 9,
+        "E": 8,
+        "total": 33,
+        "reason": "ドル円の為替介入リスク分析は実用的だが、新規性に欠ける定型的な見通し記事",
+        "magazine": "fx"
+      },
+      "total": 33,
+      "reason": "ドル円の為替介入リスク分析は実用的だが、新規性に欠ける定型的な見通し記事",
       "magazine_tag": "fx"
     },
     {
@@ -171,11 +171,11 @@
         "D": 9,
         "E": 6,
         "total": 29,
-        "reason": "日次予想記事で実用性高いが、定型的で独自性に欠ける。ドル円相場に特化し専門性あり。",
+        "reason": "日次予想記事として定期性高く対象適合性優秀。ただし新規情報・分析深度に限界",
         "magazine": "fx"
       },
       "total": 29,
-      "reason": "日次予想記事で実用性高いが、定型的で独自性に欠ける。ドル円相場に特化し専門性あり。",
+      "reason": "日次予想記事として定期性高く対象適合性優秀。ただし新規情報・分析深度に限界",
       "magazine_tag": "fx"
     },
     {
@@ -193,11 +193,11 @@
         "D": 9,
         "E": 5,
         "total": 27,
-        "reason": "カナダドル相場の現況報告。為替市場の日次動向として適切だが、分析や背景説明に欠ける。",
+        "reason": "カナダドル円相場の日々の変動を報じた定型的なニュース。為替専門読者向けだが、新規性・洞察に乏しい。",
         "magazine": "fx"
       },
       "total": 27,
-      "reason": "カナダドル相場の現況報告。為替市場の日次動向として適切だが、分析や背景説明に欠ける。",
+      "reason": "カナダドル円相場の日々の変動を報じた定型的なニュース。為替専門読者向けだが、新規性・洞察に乏しい。",
       "magazine_tag": "fx"
     },
     {
@@ -209,17 +209,17 @@
       "lang": "ja",
       "source": "Google News JP (FX)",
       "scoreData": {
-        "A": 5,
+        "A": 6,
         "B": 3,
         "C": 2,
-        "D": 8,
-        "E": 4,
-        "total": 22,
-        "reason": "スイスフラン円の日次値動き報道。為替ニュースとして定型的だが速報性と専門性あり",
+        "D": 9,
+        "E": 5,
+        "total": 25,
+        "reason": "為替レート情報として正確だが速報性に限定。日銀関連の新規情報なし。",
         "magazine": "fx"
       },
-      "total": 22,
-      "reason": "スイスフラン円の日次値動き報道。為替ニュースとして定型的だが速報性と専門性あり",
+      "total": 25,
+      "reason": "為替レート情報として正確だが速報性に限定。日銀関連の新規情報なし。",
       "magazine_tag": "fx"
     },
     {
@@ -231,17 +231,17 @@
       "lang": "ja",
       "source": "Google News JP (FX)",
       "scoreData": {
-        "A": 5,
+        "A": 4,
         "B": 2,
         "C": 2,
         "D": 8,
-        "E": 4,
+        "E": 5,
         "total": 21,
-        "reason": "豪ドル円の小幅な値動き報道。市場情報としての価値は限定的だが為替関連として適合性高い",
+        "reason": "豪ドル円の日中値動き報道。基本的な為替情報だが新規性に乏しい",
         "magazine": "fx"
       },
       "total": 21,
-      "reason": "豪ドル円の小幅な値動き報道。市場情報としての価値は限定的だが為替関連として適合性高い",
+      "reason": "豪ドル円の日中値動き報道。基本的な為替情報だが新規性に乏しい",
       "magazine_tag": "fx"
     }
   ]
