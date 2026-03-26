@@ -61,6 +61,7 @@ def fetch_rss(feed):
     url, label, lang = feed["url"], feed["label"], feed.get("lang","ja")
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=FRESHNESS_HOURS)
+    JST = timezone(timedelta(hours=9))
     try:
         req = Request(url, headers={"User-Agent":"Mozilla/5.0"})
         with urlopen(req, timeout=15) as res:
@@ -73,20 +74,26 @@ def fetch_rss(feed):
                 title = e.findtext("atom:title", namespaces=ns) or ""
                 lel = e.find("atom:link", ns)
                 link = lel.get("href","") if lel is not None else ""
-                pub_str = e.findtext("atom:published", namespaces=ns) or ""
-                pub_dt = parse_pubdate(pub_str)
+                pub_str_raw = e.findtext("atom:published", namespaces=ns) or ""
+                pub_dt = parse_pubdate(pub_str_raw)   # 切り詰め前の生文字列でパース
                 if pub_dt and pub_dt < cutoff: continue
-                items.append({"title":title.strip(),"link":link,"pubDate":pub_str[:16],"desc":"","lang":lang,"source":label})
+                pub_display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_str_raw[:16]
+                pub_iso = pub_dt.isoformat() if pub_dt else ""
+                items.append({"title":title.strip(),"link":link,"pubDate":pub_display,
+                               "pub_dt":pub_iso,"desc":"","lang":lang,"source":label})
         else:
             for item in channel.findall("item")[:RSS_MAX_ITEMS]:
-                title = re.sub(r"<[^>]+>","",item.findtext("title") or "").strip()
-                link  = item.findtext("link") or ""
-                desc  = re.sub(r"<[^>]+>","",item.findtext("description") or "")[:300]
-                pub_str = (item.findtext("pubDate") or "")[:16]
-                pub_dt  = parse_pubdate(pub_str)
+                title   = re.sub(r"<[^>]+>","",item.findtext("title") or "").strip()
+                link    = item.findtext("link") or ""
+                desc    = re.sub(r"<[^>]+>","",item.findtext("description") or "")[:300]
+                pub_str_raw = item.findtext("pubDate") or ""
+                pub_dt  = parse_pubdate(pub_str_raw)  # 切り詰め前の生文字列でパース
                 if pub_dt and pub_dt < cutoff: continue
                 if title and link:
-                    items.append({"title":title,"link":link,"pubDate":pub_str,"desc":desc,"lang":lang,"source":label})
+                    pub_display = pub_dt.astimezone(JST).strftime("%Y-%m-%d %H:%M") if pub_dt else pub_str_raw[:16]
+                    pub_iso = pub_dt.isoformat() if pub_dt else ""
+                    items.append({"title":title,"link":link,"pubDate":pub_display,
+                                  "pub_dt":pub_iso,"desc":desc,"lang":lang,"source":label})
     except Exception as e:
         print(f"RSS error ({label}): {e}", file=sys.stderr)
     return items
