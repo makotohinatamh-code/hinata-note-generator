@@ -1,0 +1,43 @@
+name: Generate Article
+
+on:
+  workflow_dispatch:
+    inputs:
+      selected_indices:
+        description: '選択ニュースのインデックス（カンマ区切り。例: 0,1,2）'
+        required: true
+        default: '0'
+      article_mode:
+        description: '記事モード'
+        required: true
+        default: 'free'
+        type: choice
+        options:
+          - free
+          - paid
+          - scenario
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate article
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GENERATE_MODE: article
+          SELECTED_INDICES: ${{ github.event.inputs.selected_indices }}
+          ARTICLE_MODE: ${{ github.event.inputs.article_mode }}
+        run: python generate.py
+      - name: Commit article_result.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add article_result.json
+          git diff --staged --quiet || git commit -m "feat: new article $(date +'%Y-%m-%d %H:%M JST')"
+          git push
