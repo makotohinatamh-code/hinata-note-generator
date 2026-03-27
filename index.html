@@ -481,6 +481,7 @@ ${newsText}
   const anim=setInterval(()=>{pb=Math.min(pb+1,85);const el=document.getElementById('genPb');if(el)el.style.width=pb+'%';},800);
 
   try{
+    let noteOriginal=null, noteImproved=null;
     let note=await callClaude(persona,userMsg,5000);
     const el=document.getElementById('genPb');if(el)el.style.width='50%';
     const gs=document.getElementById('genStatus');if(gs)gs.textContent='🐦 X投稿を生成中...';
@@ -528,21 +529,21 @@ ${newsText}
         document.getElementById('genStatus').textContent=`👥 エージェントレビュー中... ${agents.length}/3名完了`;
       }
       // エージェントレビュー結果をもとに記事を改善
+      const noteOriginal=note; // 改善前を保存
       const issues=agents.flatMap(a=>(a.rewrite_suggestions||[]).slice(0,2));
+      let noteImproved=null;
       if(issues.length>0){
         document.getElementById('genStatus').textContent='✏️ エージェントの指摘をもとに記事を改善中...';
         const improvePrompt=`以下の記事について、エージェントから改善提案が出ています。提案を反映して記事を改善してください。
 文体・構成・ペルソナ（日向真）は維持したまま、指摘された点のみ修正してください。
-
 【改善提案】
 ${issues.map((s,i)=>`${i+1}. ${s}`).join('\n')}
-
 【元の記事】
 ${note}`;
-        const improved=await callClaude(persona, improvePrompt, 5000).catch(()=>note);
+        const improved=await callClaude(persona, improvePrompt, 5000).catch(()=>null);
         if(improved&&!improved.startsWith('[ERROR]')){
-          note=improved;
-          // タイトルも再抽出
+          noteImproved=improved;
+          note=improved; // 以降はimproved版を使用
           const newTitleM=note.match(/^#\s+(.+)/m);
           if(newTitleM) title=newTitleM[1].trim();
         }
@@ -555,7 +556,7 @@ ${note}`;
     const tweetLabels=['① 告知投稿','② 共感・深掘り投稿','③ 保存系投稿','④ エンゲージメント投稿'];
     const tweets=tweetParts.slice(0,4).map((p,i)=>({label:tweetLabels[i]||`投稿${i+1}`,text:p.trim()}));
 
-    const result={generated_at:nowJst.toLocaleString('ja-JP'),title,mode,note,tweet,tweets,ai_review:aiRev,magazine:mag,agents,source_news:items.map(n=>n.title),source_urls:items.map(n=>n.link||'')};
+    const result={generated_at:nowJst.toLocaleString('ja-JP'),title,mode,note,note_original:noteOriginal||null,note_improved:noteImproved||null,tweet,tweets,ai_review:aiRev,magazine:mag,agents,source_news:items.map(n=>n.title),source_urls:items.map(n=>n.link||'')};
     saveArch(result);
     renderResult(result);
 
@@ -650,7 +651,7 @@ function renderResult(r){
       }).join('')}
     </div>
     <div id="op-rairev" class="op">${renderAiRev(r.ai_review||{})}</div>
-    ${r.mode!=='free'?`<div id="op-ragents" class="op">${renderAgents(r.agents||[])}</div>`:''}
+    ${r.mode!=='free'?`<div id="op-ragents" class="op">${renderAgentsWithDiff(r.agents||[], r.note_original||'', r.note_improved||'', r.note||'')}</div>`:''}
     <div id="op-rmag" class="op">${renderMag(r.magazine||{})}</div>
   </div>`;
   // アーカイブに保存
@@ -673,6 +674,65 @@ function renderAiRev(rev){
   const issues=(rev.issues||[]).map(iss=>`<div class="ai-issue"><div style="font-size:11px;font-weight:600;color:var(--ng);margin-bottom:2px">${esc(iss.type||'')} — 「${esc(iss.location||'')}」</div><div style="color:var(--acc);font-size:12px">💡 ${esc(iss.suggestion||'')}</div></div>`).join('');
   return `<div class="rev-panel"><div class="rev-header"><span style="font-size:18px;font-weight:700;color:${sc>=80?'var(--ok)':sc>=60?'var(--warn)':'var(--ng)'}">AI度 ${sc}</span><span style="font-size:11px;color:var(--mut)">/100（低いほど人間らしい）</span><div class="sp"></div><span class="rev-verdict ${vc}">${ov}</span></div>${issues||'<div style="font-size:13px;color:var(--ok)">✅ AI文体の問題は検出されませんでした</div>'}</div>`;
 }
+function renderAgentsWithDiff(agents, noteOriginal, noteImproved, noteFinal){
+  const hasImproved = noteImproved && noteOriginal && noteImproved!==noteOriginal;
+  let diffHtml='';
+  if(hasImproved){
+    // 改善前後の段落を比較してハイライト
+    const origParas=noteOriginal.split('\n').filter(l=>l.trim());
+    const impParas=noteImproved.split('\n').filter(l=>l.trim());
+    // 変更された行を検出
+    const changed=new Set();
+    impParas.forEach((line,i)=>{
+      if(!origParas.includes(line)) changed.add(i);
+    });
+    const diffLines=impParas.slice(0,30).map((line,i)=>{
+      const isNew=changed.has(i);
+      const escaped=line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return isNew
+        ? `<div style="background:rgba(63,185,80,.12);border-left:3px solid var(--ok);padding:4px 8px;margin:2px 0;font-size:12px;line-height:1.5">${escaped}</div>`
+        : `<div style="font-size:12px;line-height:1.5;padding:4px 8px;color:var(--mut)">${escaped}</div>`;
+    }).join('');
+    diffHtml=`<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:600;color:var(--ok)">✏️ エージェントの指摘をもとに記事を改善しました</span>
+      </div>
+      <div class="otabs" id="diff-tabs" style="margin-bottom:8px">
+        <button class="otab on" onclick="showDiffTab('after',this)">修正後（採用）</button>
+        <button class="otab" onclick="showDiffTab('before',this)">修正前（原文）</button>
+        <button class="otab" onclick="showDiffTab('diff',this)">変更箇所ハイライト</button>
+      </div>
+      <div id="diff-after" style="max-height:300px;overflow-y:auto">
+        <textarea style="width:100%;padding:8px;background:var(--s2);border:1px solid var(--ok);border-radius:6px;color:var(--text);font-size:12px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;min-height:200px" readonly>${noteImproved.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,3000)}...</textarea>
+        <button class="btn-copy" style="margin-top:6px" onclick="cpStr(document.getElementById('diff-after-full').textContent,this)">📋 修正後をコピー</button>
+        <span id="diff-after-full" style="display:none">${noteImproved.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+      </div>
+      <div id="diff-before" style="display:none;max-height:300px;overflow-y:auto">
+        <textarea style="width:100%;padding:8px;background:var(--s2);border:1px solid var(--bd);border-radius:6px;color:var(--mut);font-size:12px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;min-height:200px" readonly>${noteOriginal.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,3000)}...</textarea>
+      </div>
+      <div id="diff-diff" style="display:none;max-height:300px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:8px;background:var(--s2)">
+        <div style="font-size:11px;color:var(--mut);margin-bottom:6px">🟢 緑 = 変更・追加された行 ／ グレー = 変更なし</div>
+        ${diffLines}
+        ${impParas.length>30?'<div style="font-size:11px;color:var(--mut);padding:4px 8px">...（以下省略）</div>':''}
+      </div>
+    </div>`;
+  } else {
+    diffHtml=`<div style="background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--mut)">
+      ℹ️ エージェントの改善提案が少なかったため、記事の自動改善は行われませんでした（元の記事をそのまま使用）。
+    </div>`;
+  }
+  return diffHtml + renderAgents(agents);
+}
+
+function showDiffTab(name, btn){
+  ['after','before','diff'].forEach(n=>{
+    const el=document.getElementById('diff-'+n);
+    if(el) el.style.display=n===name?'block':'none';
+  });
+  document.querySelectorAll('#diff-tabs .otab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+}
+
 function renderAgents(agents){
   if(!agents||!agents.length) return '<div class="st">エージェントレビューなし</div>';
   return agents.map(a=>{
