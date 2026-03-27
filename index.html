@@ -115,12 +115,7 @@ input[type=url]:focus{border-color:var(--acc)}
       <div class="sp"></div>
       <span id="newsAge" style="font-size:11px;color:var(--mut)"></span>
     </div>
-    <div class="row" style="margin-bottom:10px">
-      <div style="font-size:11px;color:var(--mut);line-height:1.5">
-        毎朝7時に自動更新。手動で今すぐ最新を取得することもできます。
-      </div>
-      <button id="rssFetchBtn" class="btn btn-primary" style="width:auto;padding:8px 16px;flex-shrink:0;margin-bottom:0" onclick="fetchRSSNow()">📡 今すぐ取得</button>
-    </div>
+    <button id="rssFetchBtn" class="btn btn-primary" onclick="fetchRSSNow()" style="margin-bottom:8px">📡 今すぐ最新ニュースを取得</button>
     <div class="fbar">
       <button class="fchip on" onclick="filt('all',this)">すべて</button>
       <button class="fchip" onclick="filt('hi',this)">🟢 高(7〜)</button>
