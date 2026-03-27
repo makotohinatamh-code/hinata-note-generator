@@ -338,21 +338,21 @@ const PERSONA_FREE=PERSONA_BASE+`
 - ニュースタイトルをそのまま使わず、必ず日向真の視点で考案すること
 - 禁止：「おはようございます」「こんにちは」「こんばんは」などの時刻挨拶は本文・タイトル問わず一切禁止
 【構成】# タイトル（必ずMarkdownのH1で書き出すこと）→冒頭フック(100字)→参照ニュースURL(Markdownリンク)→## 📌まず事実確認(600字)→## 🔍ディーラー目線の裏読み(700字・エピソード必須)→## 🗓️今日注目しておくべきこと(350字)→締め「今日も最後まで読んでいただきありがとうございました。また明日。」
-文字数1,900〜2,100字。Markdown形式。末尾: #経済ニュース #日銀 #円安 #金融政策 #マーケット #為替 #経済解説 #投資`;
+文字数1,900〜2,100字。Markdown形式。末尾にハッシュタグは入れない（別途表示する）`;
 const PERSONA_PAID=PERSONA_BASE+`
 【タイトル（必須・30〜40字）】ニュースタイトルそのままは禁止。日向真の視点で考案すること。
 【禁止】「おはようございます」「こんにちは」「こんばんは」などの時刻挨拶は一切禁止。
 【有料記事】# タイトル（必ずH1で書き出す）→無料パート(2,000字)+有料パート(1,500字)。
 無料: 冒頭→参照URL→## 📌表の話→## 🔍ここが気になった→## ⚡ディーラー時代の実体験→有料誘導
 有料: ## 💡なぜ私はそう読んだのか→## 📈私が注目した数字→## 🗓️今後3日間のシナリオ→締め
-有料ラインは「---（ここから有料）---」で明示。`;
+有料ラインは「---（ここから有料）---」で明示。末尾にハッシュタグは入れない（別途表示する）`;
 const PERSONA_SCENARIO=PERSONA_BASE+`
 【タイトル（必須・30〜40字）】ニュースタイトルそのままは禁止。日向真の視点で考案すること。
 【禁止】「おはようございます」「こんにちは」「こんばんは」などの時刻挨拶は一切禁止。
 【シナリオ分析】# タイトル（必ずH1で書き出す）→無料(1,500字)+有料(2,000字)。
 無料: 冒頭→参照URL→## 📊今回の構図→## 🔍サプライズが起きるとしたら→有料誘導
 有料: ## ⚡シナリオA:メイン→## ⚡シナリオB:上振れ→## ⚡シナリオC:下振れ→## 🗓️確認する指標→締め
-有料ラインは「---（ここから有料）---」で明示。`;
+有料ラインは「---（ここから有料）---」で明示。末尾にハッシュタグは入れない（別途表示する）`;
 const TWEET_PROMPT=`「日向真（ひなた まこと）」としてXに投稿します。元大手証券会社ディーラー・育休パパ。
 禁止：アスタリスク区切り・断定的予測。絵文字は📊📌💡🏛️🌐📉📈🔍⚡🗓️のみ。
 4本セットで出力：
@@ -459,7 +459,7 @@ ${newsText}
   const anim=setInterval(()=>{pb=Math.min(pb+1,85);const el=document.getElementById('genPb');if(el)el.style.width=pb+'%';},800);
 
   try{
-    const note=await callClaude(persona,userMsg,5000);
+    let note=await callClaude(persona,userMsg,5000);
     const el=document.getElementById('genPb');if(el)el.style.width='50%';
     const gs=document.getElementById('genStatus');if(gs)gs.textContent='🐦 X投稿を生成中...';
 
@@ -467,7 +467,7 @@ ${newsText}
     if(el)el.style.width='65%';if(gs)gs.textContent='🤖 AIチェック・マガジン推薦中...';
 
     const titleM=note.match(/^#\s+(.+)/m);
-    const title=titleM?titleM[1].trim():(items[0]?.title||'').substring(0,40);
+    let title=titleM?titleM[1].trim():(items[0]?.title||'').substring(0,40);
 
     const [aiRev,mag]=await Promise.all([
       callClaude(AI_REV_PROMPT,note.substring(0,1200),600).then(r=>parseJson(r)).catch(()=>({})),
@@ -478,11 +478,45 @@ ${newsText}
     let agents=[];
     if(mode!=='free'){
       if(gs)gs.textContent='👥 エージェントレビュー中（3名）...';
-      agents=await Promise.all([
-        callClaude(AGENT_ANALYST,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='📈 経済アナリスト';return d;}).catch(()=>({agent:'📈 経済アナリスト',score:0,verdict:'エラー'})),
-        callClaude(AGENT_CONSULTANT,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='🎯 戦略コンサルタント';return d;}).catch(()=>({agent:'🎯 戦略コンサルタント',score:0,verdict:'エラー'})),
-        callClaude(AGENT_OFFICIAL,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='🏛️ 政策アドバイザー';return d;}).catch(()=>({agent:'🏛️ 政策アドバイザー',score:0,verdict:'エラー'})),
-      ]);
+      // エージェントは順次実行（並列だとタイムアウトしやすいため）
+      const agentDefs=[
+        {prompt:AGENT_ANALYST, name:'📈 経済アナリスト'},
+        {prompt:AGENT_CONSULTANT, name:'🎯 戦略コンサルタント'},
+        {prompt:AGENT_OFFICIAL, name:'🏛️ 政策アドバイザー'},
+      ];
+      for(const ag of agentDefs){
+        try{
+          const raw=await callClaude(ag.prompt,`以下の記事をレビューしてください：\n\n${note.substring(0,3000)}`,1200);
+          const d=parseJson(raw);
+          d.agent=ag.name;
+          if(!d.score&&d.score!==0) d.score=0;
+          agents.push(d);
+        }catch(e){
+          agents.push({agent:ag.name,score:0,issues:[],strengths:[],rewrite_suggestions:[],verdict:'エラー'});
+        }
+        // 進捗更新
+        document.getElementById('genStatus').textContent=`👥 エージェントレビュー中... ${agents.length}/3名完了`;
+      }
+      // エージェントレビュー結果をもとに記事を改善
+      const issues=agents.flatMap(a=>(a.rewrite_suggestions||[]).slice(0,2));
+      if(issues.length>0){
+        document.getElementById('genStatus').textContent='✏️ エージェントの指摘をもとに記事を改善中...';
+        const improvePrompt=`以下の記事について、エージェントから改善提案が出ています。提案を反映して記事を改善してください。
+文体・構成・ペルソナ（日向真）は維持したまま、指摘された点のみ修正してください。
+
+【改善提案】
+${issues.map((s,i)=>`${i+1}. ${s}`).join('\n')}
+
+【元の記事】
+${note}`;
+        const improved=await callClaude(PERSONA_FREE, improvePrompt, 5000).catch(()=>note);
+        if(improved&&!improved.startsWith('[ERROR]')){
+          note=improved;
+          // タイトルも再抽出
+          const newTitleM=note.match(/^#\s+(.+)/m);
+          if(newTitleM) title=newTitleM[1].trim();
+        }
+      }
     }
     if(el)el.style.width='100%';
     clearInterval(anim);
@@ -559,6 +593,11 @@ function renderResult(r){
         </div>
       </div>
       <textarea id="rnoteTA" rows="15">${esc(r.note||'')}</textarea>
+      <div style="margin-top:10px;background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:9px 12px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);margin-bottom:6px">#️⃣ ハッシュタグ</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:6px" id="hashtagText">#経済ニュース #日銀 #円安 #金融政策 #マーケット #為替 #経済解説 #投資</div>
+        <button class="btn-copy" onclick="cpStr(document.getElementById('hashtagText').textContent,this)">📋 ハッシュタグをコピー</button>
+      </div>
     </div>
     <div id="op-rtweet" class="op">
       <div class="url-box">
@@ -569,13 +608,13 @@ function renderResult(r){
       ${tweets.map((tw,i)=>{
         const chars=calcX(tw.text||'');
         const cc=chars>280?'var(--ng)':chars>240?'var(--warn)':'var(--mut)';
+        // 投稿テキストから指示文（投稿タイミング等）を除いた純粋な投稿内容を取得する関数
         return `<div class="tweet-card">
-          <div class="tweet-header">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
             <span class="tweet-label">${esc(tw.label||'')}</span>
-            <span style="font-size:11px;color:var(--mut)">🕐 ${dates[i]||''}</span>
-            <span style="font-size:11px;margin-left:auto;color:${cc}">${chars}/280</span>
-            <button class="btn-copy" onclick="cpStr(document.getElementById('rt${i}').textContent,this)">📋</button>
+            <button class="btn-copy" style="padding:3px 8px;font-size:11px" onclick="cpStr(document.getElementById('rt${i}').textContent,this)">📋 コピー</button>
           </div>
+          <div style="font-size:11px;color:var(--mut);margin-bottom:6px">🕐 ${dates[i]||''} &nbsp;<span style="color:${cc}">${chars}/280</span></div>
           <div class="tweet-body" id="rt${i}">${esc(tw.text||'')}</div>
         </div>`;
       }).join('')}
