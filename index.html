@@ -133,11 +133,7 @@ input[type=url]:focus{border-color:var(--acc)}
       <div class="sp"></div>
       <button class="btn-copy" onclick="clearSel()">選択解除</button>
     </div>
-    <div class="gen-box">
-      ⚙️ 記事はGitHub Actionsで生成されます。<br>
-      選択後に下のボタンを押すと、GitHub ActionsのURLが開きます。<br>
-      実行後3〜5分で「✨ 生成結果」タブに結果が表示されます。
-    </div>
+
     <button class="btn btn-free" onclick="triggerGenerate('free')">✅ 無料記事として生成</button>
     <button class="btn btn-paid" onclick="triggerGenerate('paid')">💎 有料・深掘りで生成</button>
     <button class="btn btn-scenario" onclick="triggerGenerate('scenario')">⚡ シナリオ分析で生成</button>
@@ -148,7 +144,7 @@ input[type=url]:focus{border-color:var(--acc)}
 <div class="tp" id="tp-result">
   <div id="resultArea"><div class="st">生成結果はここに表示されます<br><span style="font-size:11px">GitHub Actionsで生成後、リロードすると表示されます</span></div></div>
   <div style="text-align:center;margin-top:8px">
-    <button class="btn" style="width:auto;padding:8px 20px" onclick="loadResult()">🔄 結果をリロード</button>
+    <button class="btn" style="width:auto;padding:8px 20px" onclick="loadResult()">🔄 最新の生成結果を読み込む</button>
   </div>
 </div>
 
@@ -174,6 +170,7 @@ const REPO_OWNER = 'makotohinatamh-code';
 const REPO_NAME  = 'hinata-note-generator';
 const RAW_BASE   = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main`;
 const ACTIONS_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/workflows/article.yml`;
+const PROXY_URL   = 'https://hinata-proxy.makoto-hinata-mh.workers.dev';
 const DAYS = ['日','月','火','水','木','金','土'];
 const MAG = {
   boj:{cls:'mtag-boj',name:'🏛️ 日銀'},fx:{cls:'mtag-fx',name:'🌐 為替'},
@@ -268,14 +265,171 @@ function updSel(){
   document.getElementById('selBar').style.display=n>0?'block':'none';
 }
 
-// ── GitHub Actionsトリガー ──
-function triggerGenerate(mode){
+// ── ペルソナプロンプト ──
+const PERSONA_BASE=`あなたは「日向真（ひなた まこと）」として記事を書きます。
+34歳・男性・横浜在住。元大手証券会社 株式ディーリング部（デスクトレーダー6年）。育休中（第一子1歳6ヶ月）。
+一人称「私」。です・ます調。口語的・テンポ速い。短文多用。
+絵文字は📊 📌 💡 🏛️ 🌐 📉 📈 🔍 ⚡ 🗓️ のみ。読者「みなさん」または「忙しいみなさん」。
+禁止：断定的相場予測・特定銘柄推奨・アスタリスク区切り・論文調・週次表現。
+【時制】渡される【ニュース日時情報】を確認し、今日配信なら「今日」、昨日配信なら「昨日」、2日以上前なら「先日」「今週」など正確な表現を使う。`;
+const PERSONA_FREE=PERSONA_BASE+`
+【構成】冒頭フック(100字)→参照ニュースURL(Markdownリンク)→## 📌まず事実確認(600字)→## 🔍ディーラー目線の裏読み(700字・エピソード必須)→## 🗓️今日注目しておくべきこと(350字)→締め
+文字数1,900〜2,100字。Markdown形式。末尾: #経済ニュース #日銀 #円安 #金融政策 #マーケット #為替 #経済解説 #投資`;
+const PERSONA_PAID=PERSONA_BASE+`
+【有料記事】無料パート(2,000字)+有料パート(1,500字)。
+無料: 冒頭→参照URL→## 📌表の話→## 🔍ここが気になった→## ⚡ディーラー時代の実体験→有料誘導
+有料: ## 💡なぜ私はそう読んだのか→## 📈私が注目した数字→## 🗓️今後3日間のシナリオ→締め
+有料ラインは「---（ここから有料）---」で明示。`;
+const PERSONA_SCENARIO=PERSONA_BASE+`
+【シナリオ分析】無料(1,500字)+有料(2,000字)。
+無料: 冒頭→参照URL→## 📊今回の構図→## 🔍サプライズが起きるとしたら→有料誘導
+有料: ## ⚡シナリオA:メイン→## ⚡シナリオB:上振れ→## ⚡シナリオC:下振れ→## 🗓️確認する指標→締め
+有料ラインは「---（ここから有料）---」で明示。`;
+const TWEET_PROMPT=`「日向真（ひなた まこと）」としてXに投稿します。元大手証券会社ディーラー・育休パパ。
+禁止：アスタリスク区切り・断定的予測。絵文字は📊📌💡🏛️🌐📉📈🔍⚡🗓️のみ。
+4本セットで出力：
+【①告知】公開と同時。数字・フック冒頭。末尾「👉 【noteのURLをここに貼る】」
+【②共感】当日21:00。核心を独立した知識として。URLなし。
+【③保存】翌朝7:00。リスト形式。末尾「👉 【noteのURLをここに貼る】」
+【④エンゲ】翌夜21:00。本音・質問でエンゲージメントを引き出す。URLなし。`;
+const AI_REV_PROMPT=`日本語文章のAI文体パターンをチェックしてください。
+①アスタリスク区切り ②論文調表現 ③機械的列挙 ④接続詞の連続 ⑤「〜ではないでしょうか」多用 ⑥週次表現 ⑦過度な前置き
+{"ai_score":0-100,"issues":[{"type":"問題タイプ","location":"該当箇所20字以内","suggestion":"修正案"}],"overall":"クリア/軽微な問題あり/要修正"} JSONのみ。`;
+const MAG_PROMPT=`以下の記事の最適なnoteマガジンを推薦: boj=日銀・金融政策 fx=為替・円安 market=マーケット global=海外発 basic=経済基礎
+{"primary_magazine":"id","secondary_magazine":"idまたはnull","reason":"30字以内","paid_recommendation":true/false,"paid_reason":"理由"} JSONのみ。`;
+const AGENT_ANALYST=`元日銀出身の独立系経済アナリスト(15年)として有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
+const AGENT_CONSULTANT=`外資系戦略コンサルとして有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
+const AGENT_OFFICIAL=`元経済産業省・金融庁出身の政策アドバイザーとして有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
+
+// ── Claude API（Cloudflare Workers経由） ──
+async function callClaude(system, user, maxTokens=4000){
+  const r=await fetch(PROXY_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,system,messages:[{role:'user',content:user}]})
+  });
+  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||`HTTP ${r.status}`);}
+  const d=await r.json();
+  return d.content[0].text;
+}
+
+function parseJson(raw){
+  try{const m=raw.match(/\{[\s\S]*?\}/);if(m)return JSON.parse(m[0]);}catch(e){}return {};
+}
+
+function calcX(text){
+  let t=text.replace(/https?:\/\/[^\s]*/g,'_'.repeat(23));
+  let c=0;for(const ch of t){c+=ch.codePointAt(0)>0xFFFF?2:1;}return c;
+}
+
+// ── 日時コンテキスト ──
+function buildDtContext(items){
+  const now=new Date();
+  const nowJst=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
+  const today=new Date(nowJst.getFullYear(),nowJst.getMonth(),nowJst.getDate());
+  return items.map((item,i)=>{
+    const pub=item.pub_dt||item.pubDate||'';
+    if(!pub) return `【${i+1}】${item.title.substring(0,40)} → 配信日時不明`;
+    try{
+      const pd=new Date(pub);
+      const pjst=new Date(pd.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
+      const pdate=new Date(pjst.getFullYear(),pjst.getMonth(),pjst.getDate());
+      const diff=Math.round((today-pdate)/86400000);
+      const ptime=pjst.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+      const pmd=`${pjst.getMonth()+1}/${pjst.getDate()}`;
+      let rel=diff===0?`今日(${ptime}配信)`:diff===1?`昨日(${pmd} ${ptime}配信)`:diff<=3?`${diff}日前(${pmd}配信)`:`${diff}日前(${pmd}配信) ※古い記事`;
+      return `【${i+1}】${item.title.substring(0,40)} → ${rel}`;
+    }catch(e){return `【${i+1}】${item.title.substring(0,40)} → 配信日時不明`;}
+  }).join('\n');
+}
+
+// ── 記事生成（UIで完結） ──
+async function triggerGenerate(mode){
   if(!selected.size){alert('ニュースを1件以上選択してください');return;}
-  const indices=[...selected].join(',');
-  const modeLabel={free:'無料記事',paid:'有料・深掘り',scenario:'シナリオ分析'}[mode];
-  const msg=`GitHub Actionsで${modeLabel}を生成します。\n\n選択ニュース: インデックス ${indices}\n\n次の画面でActionsを手動実行してください：\n1.「Run workflow」ボタンをクリック\n2. selected_indices に「${indices}」を入力\n3. article_mode に「${mode}」を選択\n4. 「Run workflow」を押す\n\n3〜5分後にこのページをリロードすると結果が表示されます。`;
-  if(confirm(msg)){
-    window.open(ACTIONS_URL, '_blank');
+  const items=[...selected].map(i=>allNews[i]).filter(Boolean);
+  const newsText=items.map((n,i)=>`【${i+1}】${n.title}\nURL: ${n.link||''}`).join('\n\n');
+  const dtCtx=buildDtContext(items);
+  const now=new Date();
+  const nowJst=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));
+  const todayStr=nowJst.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+  const todayTime=nowJst.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+  const persona=mode==='paid'?PERSONA_PAID:mode==='scenario'?PERSONA_SCENARIO:PERSONA_FREE;
+  const userMsg=`現在日時: ${todayStr} ${todayTime} JST
+
+【ニュース日時情報 — 時制決定に必ず使うこと】
+${dtCtx}
+
+以下のニュースを元に記事を1本書いてください。
+
+${newsText}
+
+【必須事項】
+1. 時制は【ニュース日時情報】を厳守
+2. 「今日」「本日」は今日配信のニュースの場合のみ使用
+3. AIらしい文体禁止（アスタリスク区切り禁止）
+4. Markdown形式で出力
+5. ディーラー時代のエピソードを必ず1回以上入れる`;
+
+  // 結果タブへ移動してローディング表示
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tp').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab-btn')[1].classList.add('on');
+  document.getElementById('tp-result').classList.add('on');
+  const modeLabel={free:'✅ 無料記事',paid:'💎 有料・深掘り',scenario:'⚡ シナリオ分析'}[mode];
+  const modeClass={free:'mode-free',paid:'mode-paid',scenario:'mode-scenario'}[mode];
+  document.getElementById('resultArea').innerHTML=`
+    <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600">生成中...</span>
+        <span class="mode-badge ${modeClass}" style="margin-left:8px">${modeLabel}</span>
+      </div>
+      <div id="genStatus" class="st load">📝 note記事を生成中... (30〜60秒)</div>
+      <div class="pbwrap" style="margin-top:8px"><div class="pb" id="genPb" style="width:10%"></div></div>
+    </div>`;
+
+  let pb=10;
+  const anim=setInterval(()=>{pb=Math.min(pb+1,85);const el=document.getElementById('genPb');if(el)el.style.width=pb+'%';},800);
+
+  try{
+    const note=await callClaude(persona,userMsg,5000);
+    const el=document.getElementById('genPb');if(el)el.style.width='50%';
+    const gs=document.getElementById('genStatus');if(gs)gs.textContent='🐦 X投稿を生成中...';
+
+    const tweet=await callClaude(TWEET_PROMPT,`以下のnote記事を元にX投稿4本セットを生成してください。\n\n${note.substring(0,1500)}`,800);
+    if(el)el.style.width='65%';if(gs)gs.textContent='🤖 AIチェック・マガジン推薦中...';
+
+    const titleM=note.match(/^#\s+(.+)/m);
+    const title=titleM?titleM[1].trim():(items[0]?.title||'').substring(0,40);
+
+    const [aiRev,mag]=await Promise.all([
+      callClaude(AI_REV_PROMPT,note.substring(0,1200),600).then(r=>parseJson(r)).catch(()=>({})),
+      callClaude(MAG_PROMPT,`タイトル：${title}\n冒頭：${note.substring(0,400)}`,300).then(r=>parseJson(r)).catch(()=>({})),
+    ]);
+    if(el)el.style.width='80%';
+
+    let agents=[];
+    if(mode!=='free'){
+      if(gs)gs.textContent='👥 エージェントレビュー中（3名）...';
+      agents=await Promise.all([
+        callClaude(AGENT_ANALYST,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='📈 経済アナリスト';return d;}).catch(()=>({agent:'📈 経済アナリスト',score:0,verdict:'エラー'})),
+        callClaude(AGENT_CONSULTANT,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='🎯 戦略コンサルタント';return d;}).catch(()=>({agent:'🎯 戦略コンサルタント',score:0,verdict:'エラー'})),
+        callClaude(AGENT_OFFICIAL,`以下の記事をレビューしてください：\n\n${note}`,600).then(r=>{const d=parseJson(r);d.agent='🏛️ 政策アドバイザー';return d;}).catch(()=>({agent:'🏛️ 政策アドバイザー',score:0,verdict:'エラー'})),
+      ]);
+    }
+    if(el)el.style.width='100%';
+    clearInterval(anim);
+
+    const tweetParts=tweet.split(/【[①②③④][^】]*】/).filter(p=>p.trim());
+    const tweetLabels=['① 告知投稿','② 共感・深掘り投稿','③ 保存系投稿','④ エンゲージメント投稿'];
+    const tweets=tweetParts.slice(0,4).map((p,i)=>({label:tweetLabels[i]||`投稿${i+1}`,text:p.trim()}));
+
+    const result={generated_at:nowJst.toLocaleString('ja-JP'),title,mode,note,tweet,tweets,ai_review:aiRev,magazine:mag,agents,source_news:items.map(n=>n.title),source_urls:items.map(n=>n.link||'')};
+    saveArch(result);
+    renderResult(result);
+
+  }catch(e){
+    clearInterval(anim);
+    document.getElementById('resultArea').innerHTML=`<div class="st err">エラー: ${esc(e.message)}</div>`;
   }
 }
 
@@ -373,11 +527,6 @@ function applyUrl(){
     const el=document.getElementById('rt'+i);
     if(el) el.textContent=el.textContent.replace(/【noteのURLをここに貼る】/g,url);
   });
-}
-
-function calcX(text){
-  let t=text.replace(/https?:\/\/[^\s]*/g,'_'.repeat(23));
-  let c=0;for(const ch of t){c+=ch.codePointAt(0)>0xFFFF?2:1;}return c;
 }
 
 // ── レビュー描画 ──
