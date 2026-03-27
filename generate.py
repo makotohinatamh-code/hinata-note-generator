@@ -31,23 +31,28 @@ RSS_FEEDS = [
     {"url":"https://news.google.com/rss/search?q=Bloomberg+Reuters+Japan+economy+BOJ+yen&hl=en&gl=US&ceid=US:en","label":"Google EN (Bloomberg/Reuters)","lang":"en"},
 ]
 
-def call_claude(system_prompt, user_msg, model, max_tokens=4000):
+def call_claude(system_prompt, user_msg, model, max_tokens=4000, retries=2):
     payload = json.dumps({
         "model": model, "max_tokens": max_tokens,
         "system": system_prompt,
         "messages": [{"role":"user","content":user_msg}]
     }).encode("utf-8")
-    req = Request("https://api.anthropic.com/v1/messages", data=payload, headers={
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-    }, method="POST")
-    try:
-        with urlopen(req, timeout=180) as res:
-            return json.loads(res.read())["content"][0]["text"]
-    except Exception as e:
-        print(f"Claude APIエラー: {e}", file=sys.stderr)
-        return f"[ERROR] {e}"
+    for attempt in range(retries + 1):
+        req = Request("https://api.anthropic.com/v1/messages", data=payload, headers={
+            "Content-Type": "application/json",
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+        }, method="POST")
+        try:
+            with urlopen(req, timeout=90) as res:
+                return json.loads(res.read())["content"][0]["text"]
+        except Exception as e:
+            print(f"Claude APIエラー (attempt {attempt+1}/{retries+1}): {e}", file=sys.stderr)
+            if attempt == retries:
+                return f"[ERROR] {e}"
+            import time as _time
+            _time.sleep(3)
+    return "[ERROR] max retries exceeded"
 
 def parse_pubdate(s):
     if not s: return None
