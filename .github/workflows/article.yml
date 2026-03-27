@@ -20,13 +20,16 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-python@v5.4.0
         with:
-          python-version: '3.11'
+          python-version: '3.12'
+
       - name: Generate article
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -34,6 +37,7 @@ jobs:
           SELECTED_INDICES: ${{ github.event.inputs.selected_indices }}
           ARTICLE_MODE: ${{ github.event.inputs.article_mode }}
         run: python generate.py
+
       - name: Commit article_result.json
         run: |
           git config user.name "github-actions[bot]"
