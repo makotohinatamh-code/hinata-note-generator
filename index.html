@@ -365,9 +365,18 @@ const AI_REV_PROMPT=`日本語文章のAI文体パターンをチェックして
 {"ai_score":0-100,"issues":[{"type":"問題タイプ","location":"該当箇所20字以内","suggestion":"修正案"}],"overall":"クリア/軽微な問題あり/要修正"} JSONのみ。`;
 const MAG_PROMPT=`以下の記事の最適なnoteマガジンを推薦: boj=日銀・金融政策 fx=為替・円安 market=マーケット global=海外発 basic=経済基礎
 {"primary_magazine":"id","secondary_magazine":"idまたはnull","reason":"30字以内","paid_recommendation":true/false,"paid_reason":"理由"} JSONのみ。`;
-const AGENT_ANALYST=`元日銀出身の独立系経済アナリスト(15年)として有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
-const AGENT_CONSULTANT=`外資系戦略コンサルとして有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
-const AGENT_OFFICIAL=`元経済産業省・金融庁出身の政策アドバイザーとして有料note記事をレビュー。{"score":0-100,"issues":[],"strengths":[],"rewrite_suggestions":[],"verdict":"合格/要修正/不合格"} JSONのみ。`;
+const AGENT_ANALYST=`あなたは元日銀出身の独立系経済アナリスト（キャリア15年）です。以下の有料note記事を厳しくレビューしてください。
+評価観点：経済分析の正確性／マーケット文脈の整合性／一般メディアとの差別化／有料コンテンツとしての価値
+必ず以下のJSON形式のみで回答してください（説明文・前置き・コードブロック不要）：
+{"score":整数0-100,"issues":["問題点1","問題点2"],"strengths":["強み1","強み2"],"rewrite_suggestions":["改善案1","改善案2"],"verdict":"合格または要修正または不合格"}`;
+const AGENT_CONSULTANT=`あなたは外資系戦略コンサルティングファーム出身のビジネス戦略家です。以下の有料note記事をレビューしてください。
+評価観点：読者の行動変容を促すか／構成の論理性／実務への応用可能性／タイトルと中身の整合性
+必ず以下のJSON形式のみで回答してください（説明文・前置き・コードブロック不要）：
+{"score":整数0-100,"issues":["問題点1","問題点2"],"strengths":["強み1","強み2"],"rewrite_suggestions":["改善案1","改善案2"],"verdict":"合格または要修正または不合格"}`;
+const AGENT_OFFICIAL=`あなたは元経済産業省・金融庁出身の政策アドバイザーです。以下の有料note記事をレビューしてください。
+評価観点：規制・法令の正確性／政策文脈の理解度／表現リスク（断定的表現など）／情報ソースの信頼性
+必ず以下のJSON形式のみで回答してください（説明文・前置き・コードブロック不要）：
+{"score":整数0-100,"issues":["問題点1","問題点2"],"strengths":["強み1","強み2"],"rewrite_suggestions":["改善案1","改善案2"],"verdict":"合格または要修正または不合格"}`;
 
 // ── Claude API（Cloudflare Workers経由） ──
 async function callClaude(system, user, maxTokens=4000){
@@ -382,7 +391,20 @@ async function callClaude(system, user, maxTokens=4000){
 }
 
 function parseJson(raw){
-  try{const m=raw.match(/\{[\s\S]*?\}/);if(m)return JSON.parse(m[0]);}catch(e){}return {};
+  if(!raw) return {};
+  // コードブロック除去
+  const cleaned=raw.replace(/```[a-z]*/g,'').replace(/```/g,'').trim();
+  // 最初の { から対応する } を探す（ネスト対応）
+  const start=cleaned.indexOf('{');
+  if(start===-1) return {};
+  let depth=0, end=-1;
+  for(let i=start;i<cleaned.length;i++){
+    if(cleaned[i]==='{') depth++;
+    else if(cleaned[i]==='}'){depth--;if(depth===0){end=i;break;}}
+  }
+  if(end===-1) return {};
+  try{return JSON.parse(cleaned.substring(start,end+1));}catch(e){}
+  return {};
 }
 
 function calcX(text){
@@ -486,13 +508,21 @@ ${newsText}
       ];
       for(const ag of agentDefs){
         try{
-          const raw=await callClaude(ag.prompt,`以下の記事をレビューしてください：\n\n${note.substring(0,3000)}`,1200);
+          const raw=await callClaude(ag.prompt,`以下の記事をレビューしてください：\n\n${note.substring(0,3000)}`,1500);
           const d=parseJson(raw);
           d.agent=ag.name;
-          if(!d.score&&d.score!==0) d.score=0;
+          // scoreが数値でない場合は文字列から抽出
+          if(typeof d.score!=='number'){
+            const sm=raw.match(/"score"\s*:\s*(\d+)/);
+            d.score=sm?parseInt(sm[1]):0;
+          }
+          // verdictが未取得の場合はテキストから推測
+          if(!d.verdict){
+            d.verdict=d.score>=80?'合格':d.score>=50?'要修正':'不合格';
+          }
           agents.push(d);
         }catch(e){
-          agents.push({agent:ag.name,score:0,issues:[],strengths:[],rewrite_suggestions:[],verdict:'エラー'});
+          agents.push({agent:ag.name,score:0,issues:[`エラー: ${e.message}`],strengths:[],rewrite_suggestions:[],verdict:'エラー'});
         }
         // 進捗更新
         document.getElementById('genStatus').textContent=`👥 エージェントレビュー中... ${agents.length}/3名完了`;
@@ -509,7 +539,7 @@ ${issues.map((s,i)=>`${i+1}. ${s}`).join('\n')}
 
 【元の記事】
 ${note}`;
-        const improved=await callClaude(PERSONA_FREE, improvePrompt, 5000).catch(()=>note);
+        const improved=await callClaude(persona, improvePrompt, 5000).catch(()=>note);
         if(improved&&!improved.startsWith('[ERROR]')){
           note=improved;
           // タイトルも再抽出
