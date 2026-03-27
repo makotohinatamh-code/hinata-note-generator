@@ -179,7 +179,7 @@ const MAG = {
 };
 const ML = {free:'無料',paid:'有料💎',scenario:'シナリオ⚡'};
 
-let allNews=[], filteredNews=[], selected=new Set(), archAll=[], activeArchIdx=-1;
+let allNews=[], filteredNews=[], selected=new Set(), archAll=[], activeArchIdx=-1, currentResult=null;
 
 function tab(name,btn){
   document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('on'));
@@ -187,7 +187,11 @@ function tab(name,btn){
   btn.classList.add('on'); document.getElementById('tp-'+name).classList.add('on');
   if(name==='archive') loadArchive();
   if(name==='events')  renderEvents();
-  if(name==='result')  loadResult();
+  if(name==='result'){
+    // 生成済み結果があればそれを表示、なければGitHubから取得
+    if(currentResult) renderResult(currentResult);
+    else loadResult();
+  }
 }
 function otab(name,btn,gid){
   document.querySelectorAll(`#${gid} .otab`).forEach(t=>t.classList.remove('on'));
@@ -557,6 +561,7 @@ ${note}`;
     const tweets=tweetParts.slice(0,4).map((p,i)=>({label:tweetLabels[i]||`投稿${i+1}`,text:p.trim()}));
 
     const result={generated_at:nowJst.toLocaleString('ja-JP'),title,mode,note,note_original:noteOriginal||null,note_improved:noteImproved||null,tweet,tweets,ai_review:aiRev,magazine:mag,agents,source_news:items.map(n=>n.title),source_urls:items.map(n=>n.link||'')};
+    currentResult=result;
     saveArch(result);
     renderResult(result);
 
@@ -574,6 +579,7 @@ async function loadResult(){
     const r=await fetch(`${RAW_BASE}/article_result.json?t=${Date.now()}`);
     if(!r.ok) throw new Error('まだ生成結果がありません（Actions実行後3〜5分で表示されます）');
     const d=await r.json();
+    currentResult=d;
     renderResult(d);
   }catch(e){
     area.innerHTML=`<div class="st err">${esc(e.message)}</div>`;
@@ -693,27 +699,28 @@ function renderAgentsWithDiff(agents, noteOriginal, noteImproved, noteFinal){
         ? `<div style="background:rgba(63,185,80,.12);border-left:3px solid var(--ok);padding:4px 8px;margin:2px 0;font-size:12px;line-height:1.5">${escaped}</div>`
         : `<div style="font-size:12px;line-height:1.5;padding:4px 8px;color:var(--mut)">${escaped}</div>`;
     }).join('');
-    diffHtml=`<div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-size:12px;font-weight:600;color:var(--ok)">✏️ エージェントの指摘をもとに記事を改善しました</span>
+    // noteImproved/Originalをデータ属性でセーフに保持
+    const safeImp=noteImproved.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const safeOrig=noteOriginal.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    diffHtml=`<div style="background:var(--sf);border:1px solid var(--ok);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:600;color:var(--ok);margin-bottom:10px">✏️ エージェントの指摘をもとに記事を改善しました</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn-copy on" id="dbtAfter" onclick="showDiffTab('after')" style="padding:6px 12px;font-size:12px;border-radius:6px;border:1px solid var(--ok);background:rgba(63,185,80,.15);color:var(--ok);cursor:pointer">修正後（採用）</button>
+        <button class="btn-copy" id="dbtBefore" onclick="showDiffTab('before')" style="padding:6px 12px;font-size:12px;border-radius:6px;cursor:pointer">修正前（原文）</button>
+        <button class="btn-copy" id="dbtDiff" onclick="showDiffTab('diff')" style="padding:6px 12px;font-size:12px;border-radius:6px;cursor:pointer">変更箇所ハイライト</button>
       </div>
-      <div class="otabs" id="diff-tabs" style="margin-bottom:8px">
-        <button class="otab on" onclick="showDiffTab('after',this)">修正後（採用）</button>
-        <button class="otab" onclick="showDiffTab('before',this)">修正前（原文）</button>
-        <button class="otab" onclick="showDiffTab('diff',this)">変更箇所ハイライト</button>
+      <div id="diff-after">
+        <div style="font-size:11px;color:var(--mut);margin-bottom:5px">👇 note記事タブと同じ内容です</div>
+        <div style="background:var(--s2);border:1px solid var(--ok);border-radius:6px;padding:10px;font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow-y:auto;word-break:break-all">${safeImp}</div>
+        <button class="btn-copy" style="margin-top:6px" id="diffCopyBtn">📋 修正後をコピー</button>
       </div>
-      <div id="diff-after" style="max-height:300px;overflow-y:auto">
-        <textarea style="width:100%;padding:8px;background:var(--s2);border:1px solid var(--ok);border-radius:6px;color:var(--text);font-size:12px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;min-height:200px" readonly>${noteImproved.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,3000)}...</textarea>
-        <button class="btn-copy" style="margin-top:6px" onclick="cpStr(document.getElementById('diff-after-full').textContent,this)">📋 修正後をコピー</button>
-        <span id="diff-after-full" style="display:none">${noteImproved.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+      <div id="diff-before" style="display:none">
+        <div style="font-size:11px;color:var(--mut);margin-bottom:5px">👇 エージェントレビュー前の元の記事です</div>
+        <div style="background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:10px;font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow-y:auto;color:var(--mut);word-break:break-all">${safeOrig}</div>
       </div>
-      <div id="diff-before" style="display:none;max-height:300px;overflow-y:auto">
-        <textarea style="width:100%;padding:8px;background:var(--s2);border:1px solid var(--bd);border-radius:6px;color:var(--mut);font-size:12px;line-height:1.7;resize:vertical;font-family:inherit;outline:none;min-height:200px" readonly>${noteOriginal.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,3000)}...</textarea>
-      </div>
-      <div id="diff-diff" style="display:none;max-height:300px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:8px;background:var(--s2)">
+      <div id="diff-diff" style="display:none">
         <div style="font-size:11px;color:var(--mut);margin-bottom:6px">🟢 緑 = 変更・追加された行 ／ グレー = 変更なし</div>
-        ${diffLines}
-        ${impParas.length>30?'<div style="font-size:11px;color:var(--mut);padding:4px 8px">...（以下省略）</div>':''}
+        <div style="background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:8px;max-height:400px;overflow-y:auto">${diffLines}${impParas.length>30?'<div style="font-size:11px;color:var(--mut);padding:4px 8px">...（以下省略）</div>':''}</div>
       </div>
     </div>`;
   } else {
@@ -724,13 +731,30 @@ function renderAgentsWithDiff(agents, noteOriginal, noteImproved, noteFinal){
   return diffHtml + renderAgents(agents);
 }
 
-function showDiffTab(name, btn){
+function showDiffTab(name){
   ['after','before','diff'].forEach(n=>{
     const el=document.getElementById('diff-'+n);
     if(el) el.style.display=n===name?'block':'none';
   });
-  document.querySelectorAll('#diff-tabs .otab').forEach(t=>t.classList.remove('on'));
-  btn.classList.add('on');
+  // ボタンのスタイル切り替え
+  const btns={after:'dbtAfter',before:'dbtBefore',diff:'dbtDiff'};
+  Object.entries(btns).forEach(([k,id])=>{
+    const b=document.getElementById(id);
+    if(!b) return;
+    if(k===name){
+      b.style.borderColor='var(--ok)';b.style.background='rgba(63,185,80,.15)';b.style.color='var(--ok)';
+    } else {
+      b.style.borderColor='var(--bd)';b.style.background='transparent';b.style.color='var(--mut)';
+    }
+  });
+  // 修正後タブのコピーボタンにイベントを設定
+  if(name==='after'){
+    const cb=document.getElementById('diffCopyBtn');
+    if(cb) cb.onclick=()=>{
+      const txt=document.getElementById('diff-after').querySelector('div[style*="pre-wrap"]')?.textContent||'';
+      navigator.clipboard.writeText(txt).then(()=>{cb.textContent='✓ コピー済み';setTimeout(()=>cb.textContent='📋 修正後をコピー',2000);});
+    };
+  }
 }
 
 function renderAgents(agents){
