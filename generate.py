@@ -21,14 +21,34 @@ MODE              = os.environ.get("GENERATE_MODE", "schedule")
 SELECTED_INDICES  = os.environ.get("SELECTED_INDICES", "")
 ARTICLE_MODE      = os.environ.get("ARTICLE_MODE", "free")
 
+# 信頼できるソースを指定したRSSフィード
+# Google News の site: オペレーターで大手報道機関に絞り込み
+# Reuters直接RSS（feeds.reuters.com）は2026年3月時点で廃止済みのため除外
 RSS_FEEDS = [
-    {"url":"https://news.google.com/rss/search?q=%E6%97%A5%E9%8A%80+%E9%87%91%E8%9E%8D%E6%94%BF%E7%AD%96+%E7%82%BA%E6%9B%BF+%E5%86%86%E5%AE%89&hl=ja&gl=JP&ceid=JP:ja","label":"Google News JP (BOJ)","lang":"ja"},
-    {"url":"https://news.google.com/rss/search?q=%E6%97%A5%E6%9C%AC%E7%B5%8C%E6%B8%88+%E9%87%91%E5%88%A9+%E3%83%9E%E3%83%BC%E3%82%B1%E3%83%83%E3%83%88&hl=ja&gl=JP&ceid=JP:ja","label":"Google News JP (Market)","lang":"ja"},
-    {"url":"https://news.google.com/rss/search?q=%E7%82%BA%E6%9B%BF%E4%BB%8B%E5%85%A5+%E5%86%86%E9%AB%98+%E5%86%86%E5%AE%89&hl=ja&gl=JP&ceid=JP:ja","label":"Google News JP (FX)","lang":"ja"},
-    {"url":"https://news.google.com/rss/search?q=Bank+of+Japan+monetary+policy+interest+rate&hl=en&gl=US&ceid=US:en","label":"Google EN (BOJ)","lang":"en"},
-    {"url":"https://news.google.com/rss/search?q=Federal+Reserve+FOMC+interest+rate+decision&hl=en&gl=US&ceid=US:en","label":"Google EN (Fed)","lang":"en"},
-    {"url":"https://news.google.com/rss/search?q=Japan+yen+dollar+forex+currency+market&hl=en&gl=US&ceid=US:en","label":"Google EN (FX)","lang":"en"},
-    {"url":"https://news.google.com/rss/search?q=Bloomberg+Reuters+Japan+economy+BOJ+yen&hl=en&gl=US&ceid=US:en","label":"Google EN (Bloomberg/Reuters)","lang":"en"},
+    # ── JP：大手報道機関指定 ────────────────────────────────
+    {"url":"https://news.google.com/rss/search?q=%E6%97%A5%E9%8A%80%20%E9%87%91%E8%9E%8D%E6%94%BF%E7%AD%96%20%28site%3Anikkei.com%20OR%20site%3Anhk.or.jp%20OR%20site%3Areuters.com%20OR%20site%3Abloomberg.co.jp%29&hl=ja&gl=JP&ceid=JP:ja",
+     "label":"Google JP 日銀×大手紙","lang":"ja"},
+    {"url":"https://news.google.com/rss/search?q=%E7%82%BA%E6%9B%BF%20%E5%86%86%E5%AE%89%20%E5%86%86%E9%AB%98%20%E6%97%A5%E9%8A%80%20%28site%3Anikkei.com%20OR%20site%3Anhk.or.jp%20OR%20site%3Abloomberg.co.jp%29&hl=ja&gl=JP&ceid=JP:ja",
+     "label":"Google JP 為替×大手紙","lang":"ja"},
+    {"url":"https://news.google.com/rss/search?q=%E6%A0%AA%E5%BC%8F%E5%B8%82%E5%A0%B4%20%E9%87%91%E5%88%A9%20%E5%82%B5%E5%88%B8%20%E6%97%A5%E6%9C%AC%E7%B5%8C%E6%B8%88%20%E6%99%AF%E6%B0%97&hl=ja&gl=JP&ceid=JP:ja",
+     "label":"Google JP マーケット","lang":"ja"},
+    {"url":"https://news.google.com/rss/search?q=%E7%B5%8C%E6%B8%88%E6%94%BF%E7%AD%96%20%E8%B2%A1%E6%94%BF%20%E6%97%A5%E6%9C%AC%E9%8A%80%E8%A1%8C%20%E9%87%91%E8%9E%8D%E7%B7%A9%E5%92%8C&hl=ja&gl=JP&ceid=JP:ja",
+     "label":"Google JP 経済政策","lang":"ja"},
+    # ── JP：経済基礎（basicマガジン向け）───────────────────
+    {"url":"https://news.google.com/rss/search?q=%E3%82%A4%E3%83%B3%E3%83%95%E3%83%AC%20%E7%89%A9%E4%BE%A1%20%E8%B3%83%E9%87%91%20GDP%20%E6%99%AF%E6%B0%97%20%E8%A7%A3%E8%AA%AC&hl=ja&gl=JP&ceid=JP:ja",
+     "label":"Google JP 経済基礎","lang":"ja"},
+    # ── NHK直接RSS（経済カテゴリ・アクティブ確認済み）──────
+    {"url":"https://news.web.nhk/n-data/conf/na/rss/cat6.xml",
+     "label":"NHK 経済","lang":"ja"},
+    # ── EN：大手報道機関指定 ────────────────────────────────
+    {"url":"https://news.google.com/rss/search?q=Bank%20of%20Japan%20monetary%20policy%20%28site%3Areuters.com%20OR%20site%3Abloomberg.com%20OR%20site%3Aft.com%29&hl=en&gl=US&ceid=US:en",
+     "label":"Google EN BOJ×Reuters/Bloomberg","lang":"en"},
+    {"url":"https://news.google.com/rss/search?q=Federal%20Reserve%20FOMC%20interest%20rate%20%28site%3Areuters.com%20OR%20site%3Abloomberg.com%20OR%20site%3Awsj.com%29&hl=en&gl=US&ceid=US:en",
+     "label":"Google EN Fed×Reuters/Bloomberg","lang":"en"},
+    {"url":"https://news.google.com/rss/search?q=Japan%20yen%20dollar%20forex%20currency%20intervention%20%28site%3Areuters.com%20OR%20site%3Abloomberg.com%29&hl=en&gl=US&ceid=US:en",
+     "label":"Google EN JPY/FX×Reuters/Bloomberg","lang":"en"},
+    {"url":"https://news.google.com/rss/search?q=global%20economy%20inflation%20recession%20GDP%20%28site%3Areuters.com%20OR%20site%3Aft.com%20OR%20site%3Abloomberg.com%29&hl=en&gl=US&ceid=US:en",
+     "label":"Google EN Global Economy","lang":"en"},
 ]
 
 def call_claude(system_prompt, user_msg, model, max_tokens=4000, retries=2):
@@ -112,6 +132,40 @@ def fetch_all():
     all_items.sort(key=lambda x: x.get("pub_dt",""), reverse=True)
     return all_items
 
+# ソース信頼度マップ（ドメイン → スコア/ラベル）
+SOURCE_TRUST = {
+    # ◎ 一次情報・公的機関
+    "boj.or.jp": 100, "mof.go.jp": 100, "cao.go.jp": 100,
+    "federalreserve.gov": 100, "ecb.europa.eu": 100, "stat.go.jp": 100,
+    # ○ 大手国際報道機関
+    "reuters.com": 90, "bloomberg.com": 90, "bloomberg.co.jp": 90,
+    "ft.com": 90, "wsj.com": 88, "apnews.com": 88,
+    # ○ 国内大手報道機関
+    "nikkei.com": 85, "nhk.or.jp": 88, "news.web.nhk": 88,
+    "mainichi.jp": 80, "yomiuri.co.jp": 80, "asahi.com": 80, "sankei.com": 78,
+    # △ 経済専門誌
+    "toyokeizai.net": 75, "diamond.jp": 72, "cnbc.com": 80, "marketwatch.com": 78,
+    # ▲ 商業FXメディア・低信頼（ワーニング対象）
+    "zai.diamond.jp": 40, "minkabu.jp": 45, "kabutan.jp": 45,
+    "traders.co.jp": 40, "fxstreet.com": 45, "dailyfx.com": 45,
+}
+# 低信頼ドメイン（ワーニング表示）
+LOW_TRUST_DOMAINS = [d for d, s in SOURCE_TRUST.items() if s < 60]
+
+def get_source_trust(url):
+    """URLからソース信頼スコアを返す。未知ドメインは60（中立）"""
+    if not url:
+        return 60, None
+    from urllib.parse import urlparse
+    try:
+        domain = urlparse(url).netloc.replace("www.", "")
+    except Exception:
+        return 60, None
+    for d, score in SOURCE_TRUST.items():
+        if d in domain:
+            return score, d
+    return 60, None  # 未知ドメイン
+
 SCORE_PROMPT = """ニュース記事を5軸で各10点満点（計50点）でスコアリングしてください。英語記事でも日本語で評価してください。
 A.注目度 B.先進性 C.意外性 D.著者適合性（経済・金融・為替・日銀） E.読者価値
 最適なマガジンも選択：boj/fx/market/global/basic
@@ -122,6 +176,9 @@ def score_single(item):
     raw = call_claude(SCORE_PROMPT,
                       f"{prefix}Title: {item['title']}\nSummary: {item.get('desc','')}",
                       model=SCORING_MODEL, max_tokens=150)
+    # ソース信頼スコアを付与
+    trust_score, matched_domain = get_source_trust(item.get("link",""))
+    is_low_trust = trust_score < 60
     try:
         m = re.search(r'\{.*?\}', raw, re.DOTALL)
         if m:
@@ -129,10 +186,12 @@ def score_single(item):
             if "total" not in d:
                 d["total"] = sum(d.get(k,0) for k in ["A","B","C","D","E"])
             return {**item,"scoreData":d,"total":int(d["total"]),
-                    "reason":d.get("reason",""),"magazine_tag":d.get("magazine","market")}
+                    "reason":d.get("reason",""),"magazine_tag":d.get("magazine","market"),
+                    "trust_score":trust_score,"low_trust":is_low_trust}
     except Exception:
         pass
-    return {**item,"scoreData":{},"total":0,"reason":"error","magazine_tag":"market"}
+    return {**item,"scoreData":{},"total":0,"reason":"error","magazine_tag":"market",
+            "trust_score":trust_score,"low_trust":is_low_trust}
 
 def score_batch(items):
     results = []

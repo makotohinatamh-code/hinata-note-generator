@@ -255,12 +255,33 @@ async function fetchRSSNow(){
   btn.disabled=false; btn.textContent='📡 今すぐ取得';
 }
 
+// ソース信頼度マップ
+const SOURCE_TRUST={
+  "boj.or.jp":100,"mof.go.jp":100,"cao.go.jp":100,"federalreserve.gov":100,"ecb.europa.eu":100,
+  "reuters.com":90,"bloomberg.com":90,"bloomberg.co.jp":90,"ft.com":90,"wsj.com":88,"apnews.com":88,
+  "nikkei.com":85,"nhk.or.jp":88,"news.web.nhk":88,
+  "mainichi.jp":80,"yomiuri.co.jp":80,"asahi.com":80,"sankei.com":78,
+  "toyokeizai.net":75,"diamond.jp":72,"cnbc.com":80,"marketwatch.com":78,
+  "zai.diamond.jp":40,"minkabu.jp":45,"kabutan.jp":45,"traders.co.jp":40,"fxstreet.com":45,
+};
+function getTrustScore(url){
+  if(!url) return {score:60,low:false};
+  try{
+    const domain=new URL(url).hostname.replace(/^www\./,'');
+    for(const [d,s] of Object.entries(SOURCE_TRUST)){
+      if(domain.includes(d)) return {score:s,low:s<60};
+    }
+  }catch(e){}
+  return {score:60,low:false};
+}
+
 const SCORE_PROMPT=`ニュース記事を5軸で各10点満点（計50点）でスコアリングしてください。英語記事でも日本語で評価してください。
 A.注目度 B.先進性 C.意外性 D.著者適合性（経済・金融・為替・日銀） E.読者価値
 最適なマガジンも選択：boj/fx/market/global/basic
 JSONのみ回答：{"A":X,"B":X,"C":X,"D":X,"E":X,"total":X,"reason":"30字以内","magazine":"id"}`;
 
 async function scoreItem(item){
+  const trust=getTrustScore(item.link||'');
   try{
     const prefix=item.lang==='en'?'[EN] ':'';
     const raw=await callClaude(SCORE_PROMPT,`${prefix}Title: ${item.title}\nSummary: ${item.desc||''}`,150);
@@ -268,10 +289,12 @@ async function scoreItem(item){
     if(m){
       const d=JSON.parse(m[0]);
       if(!d.total) d.total=((d.A||0)+(d.B||0)+(d.C||0)+(d.D||0)+(d.E||0));
-      return {...item,scoreData:d,total:parseInt(d.total)||0,reason:d.reason||'',magazine_tag:d.magazine||'market'};
+      return {...item,scoreData:d,total:parseInt(d.total)||0,reason:d.reason||'',
+              magazine_tag:d.magazine||'market',trust_score:trust.score,low_trust:trust.low};
     }
   }catch(e){}
-  return {...item,scoreData:{},total:0,reason:'',magazine_tag:'market'};
+  return {...item,scoreData:{},total:0,reason:'',magazine_tag:'market',
+          trust_score:trust.score,low_trust:trust.low};
 }
 
 function renderNews(){
@@ -285,6 +308,9 @@ function renderNews(){
     const mag=item.magazine_tag||'market';
     const mi=MAG[mag]||MAG.market;
     const en=item.lang==='en'?'<span style="font-size:10px;padding:1px 5px;border-radius:6px;background:rgba(210,153,34,.1);color:var(--warn)">EN</span>':'';
+    // ソース信頼スコアがJSONにある場合はそちらを使い、なければURLから判定
+    const trustInfo=item.trust_score!==undefined?{score:item.trust_score,low:item.low_trust}:getTrustScore(item.link||'');
+    const lowTrustBadge=trustInfo.low?'<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(248,81,73,.1);color:var(--ng);border:1px solid rgba(248,81,73,.25)">⚠️ 低信頼</span>':'';
     return `<div class="ni${sel?' sel':''}" onclick="selItem(${idx})">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <input type="checkbox" class="ni-chk" ${sel?'checked':''} onclick="event.stopPropagation();selItem(${idx})">
@@ -293,9 +319,11 @@ function renderNews(){
           <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
             <span class="sbadge ${cls}">★ ${avg}/10</span>
             <span class="mtag ${mi.cls}">${mi.name}</span>
-            ${en}<span style="font-size:10px;color:var(--mut)">${item.pubDate||''}</span>
+            ${en}${lowTrustBadge}
+            <span style="font-size:10px;color:var(--mut)">${item.pubDate||''}</span>
             ${item.reason?`<span style="font-size:10px;color:var(--mut);font-style:italic">${esc(item.reason)}</span>`:''}
           </div>
+          ${trustInfo.low?'<div style="font-size:10px;color:var(--ng);margin-top:3px">⚠️ 商業FXメディア等の可能性あり。一次情報の確認を推奨します。</div>':''}
         </div>
       </div>
     </div>`;
